@@ -1,0 +1,26 @@
+@model orderManagementSystem.Models.Order
+
+@{
+    ViewData["Title"] = "Order Details";
+}
+
+<h1>Order Details</h1>
+
+<hr />
+
+<dl class="row">
+    <dt class="col-sm-3">Customer Name</dt>
+    <dd class="col-sm-9">@Model.CustomerName</dd>
+
+    <dt class="col-sm-3">Order Date</dt>
+    <dd class="col-sm-9">@Model.OrderDate.ToString("MMM dd, yyyy hh:mm tt")</dd>
+
+    <dt class="col-sm-3">Total Amount</dt>
+    <dd class="col-sm-9">@Model.TotalAmount.ToString("N2")</dd>
+
+    <dt class="col-sm-3">Status</dt>
+    <dd class="col-sm-9">@Model.Status</dd>
+</dl>
+
+<a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a>
+<a asp-action="Index" class="btn btn-secondary">Back to Orders</a>
