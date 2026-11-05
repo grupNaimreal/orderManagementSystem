@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using orderManagementSystem.Models;
 
@@ -9,4 +9,6 @@ public class ApplicationDbContext(
     : IdentityDbContext(options)
 {
     public DbSet<Order> Orders { get; set; }
+
+public DbSet<orderManagementSystem.Models.Employees> Employees { get; set; } = default!;
 }
