@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+app-local.db
+app-local.db-shm
+app-local.db-wal
+*.user
+*.suo
+.vscode/
