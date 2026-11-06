@@ -1,157 +1,251 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using orderManagementSystem.Data;
 using orderManagementSystem.Models;
 
-namespace orderManagementSystem.Controllers
+namespace orderManagementSystem.Controllers;
+
+[Authorize(Roles = "Owner")]
+public class EmployeesController : Controller
 {
-    public class EmployeesController : Controller
+    private readonly ApplicationDbContext _context;
+    private readonly UserManager<IdentityUser> _userManager;
+
+    public EmployeesController(ApplicationDbContext context, UserManager<IdentityUser> userManager)
     {
-        private readonly ApplicationDbContext _context;
+        _context = context;
+        _userManager = userManager;
+    }
 
-        public EmployeesController(ApplicationDbContext context)
+    private async Task<List<StaffRowViewModel>> GetRowsAsync()
+    {
+        var employees = await _context.Employees
+            .AsNoTracking()
+            .Include(e => e.IdentityUser)
+            .Where(e => e.IdentityUser != null)
+            .OrderBy(e => e.Name)
+            .ToListAsync();
+
+        var rows = new List<StaffRowViewModel>();
+        foreach (var employee in employees)
         {
-            _context = context;
+            var user = employee.IdentityUser!;
+            var roles = await _userManager.GetRolesAsync(user);
+            rows.Add(new StaffRowViewModel
+            {
+                Id = employee.Id,
+                Name = employee.Name,
+                Email = user.Email ?? user.UserName ?? "",
+                Role = string.Join(", ", roles),
+                IsActive = employee.IsActive
+            });
+        }
+        return rows;
+    }
+
+    public async Task<IActionResult> Index(string? term)
+    {
+        var rows = await GetRowsAsync();
+        if (!string.IsNullOrWhiteSpace(term))
+        {
+            var value = term.Trim();
+            rows = rows.Where(e => e.Name.Contains(value, StringComparison.OrdinalIgnoreCase)
+                || e.Email.Contains(value, StringComparison.OrdinalIgnoreCase)
+                || e.Role.Contains(value, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+        return View(rows);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Search(string? term)
+    {
+        var rows = await GetRowsAsync();
+        if (!string.IsNullOrWhiteSpace(term))
+        {
+            var value = term.Trim();
+            rows = rows.Where(e => e.Name.Contains(value, StringComparison.OrdinalIgnoreCase)
+                || e.Email.Contains(value, StringComparison.OrdinalIgnoreCase)
+                || e.Role.Contains(value, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+        return PartialView("_EmployeeRows", rows);
+    }
+
+    [HttpGet]
+    public IActionResult Create() => View(new StaffCreateViewModel());
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(StaffCreateViewModel model)
+    {
+        if (!ModelState.IsValid) return View(model);
+        if (await _userManager.FindByEmailAsync(model.Email.Trim()) != null)
+        {
+            ModelState.AddModelError(nameof(model.Email), "That email is already registered.");
+            return View(model);
         }
 
-        // GET: Employees
-        public async Task<IActionResult> Index()
+        var user = new IdentityUser
         {
-            return View(await _context.Employees.ToListAsync());
+            UserName = model.Email.Trim(),
+            Email = model.Email.Trim(),
+            EmailConfirmed = true
+        };
+        var createResult = await _userManager.CreateAsync(user, model.Password);
+        if (!createResult.Succeeded)
+        {
+            foreach (var error in createResult.Errors)
+                ModelState.AddModelError(string.Empty, error.Description);
+            return View(model);
         }
 
-        // GET: Employees/Details/5
-        public async Task<IActionResult> Details(int? id)
+        var roleResult = await _userManager.AddToRoleAsync(user, model.Role);
+        if (!roleResult.Succeeded)
         {
-            if (id == null)
-            {
-                return NotFound();
-            }
-
-            var employees = await _context.Employees
-                .FirstOrDefaultAsync(m => m.Id == id);
-            if (employees == null)
-            {
-                return NotFound();
-            }
-
-            return View(employees);
+            await _userManager.DeleteAsync(user);
+            foreach (var error in roleResult.Errors)
+                ModelState.AddModelError(string.Empty, error.Description);
+            return View(model);
         }
 
-        // GET: Employees/Create
-        public IActionResult Create()
+        try
         {
-            return View();
-        }
-
-        // POST: Employees/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,Name,Password,Role,Status")] Employees employees)
-        {
-            if (ModelState.IsValid)
+            _context.Employees.Add(new Employees
             {
-                _context.Add(employees);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
-            }
-            return View(employees);
-        }
-
-        // GET: Employees/Edit/5
-        public async Task<IActionResult> Edit(int? id)
-        {
-            if (id == null)
-            {
-                return NotFound();
-            }
-
-            var employees = await _context.Employees.FindAsync(id);
-            if (employees == null)
-            {
-                return NotFound();
-            }
-            return View(employees);
-        }
-
-        // POST: Employees/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Password,Role,Status")] Employees employees)
-        {
-            if (id != employees.Id)
-            {
-                return NotFound();
-            }
-
-            if (ModelState.IsValid)
-            {
-                try
-                {
-                    _context.Update(employees);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!EmployeesExists(employees.Id))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-                return RedirectToAction(nameof(Index));
-            }
-            return View(employees);
-        }
-
-        // GET: Employees/Delete/5
-        public async Task<IActionResult> Delete(int? id)
-        {
-            if (id == null)
-            {
-                return NotFound();
-            }
-
-            var employees = await _context.Employees
-                .FirstOrDefaultAsync(m => m.Id == id);
-            if (employees == null)
-            {
-                return NotFound();
-            }
-
-            return View(employees);
-        }
-
-        // POST: Employees/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            var employees = await _context.Employees.FindAsync(id);
-            if (employees != null)
-            {
-                _context.Employees.Remove(employees);
-            }
-
+                Name = model.Name.Trim(),
+                IdentityUserId = user.Id,
+                IsActive = true
+            });
             await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
+        }
+        catch
+        {
+            await _userManager.DeleteAsync(user);
+            throw;
         }
 
-        private bool EmployeesExists(int id)
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Details(int id)
+    {
+        var row = (await GetRowsAsync()).FirstOrDefault(e => e.Id == id);
+        return row == null ? NotFound() : View(row);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Edit(int id)
+    {
+        var employee = await _context.Employees.Include(e => e.IdentityUser)
+            .FirstOrDefaultAsync(e => e.Id == id);
+        if (employee?.IdentityUser == null) return NotFound();
+        var roles = await _userManager.GetRolesAsync(employee.IdentityUser);
+        return View(new StaffEditViewModel
         {
-            return _context.Employees.Any(e => e.Id == id);
+            Id = employee.Id,
+            Name = employee.Name,
+            Email = employee.IdentityUser.Email ?? "",
+            Role = roles.FirstOrDefault() ?? "Employee",
+            IsActive = employee.IsActive
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(StaffEditViewModel model)
+    {
+        if (!ModelState.IsValid) return View(model);
+        var employee = await _context.Employees.Include(e => e.IdentityUser)
+            .FirstOrDefaultAsync(e => e.Id == model.Id);
+        if (employee?.IdentityUser == null) return NotFound();
+        var user = employee.IdentityUser;
+        var email = model.Email.Trim();
+        var duplicate = await _userManager.FindByEmailAsync(email);
+        if (duplicate != null && duplicate.Id != user.Id)
+        {
+            ModelState.AddModelError(nameof(model.Email), "That email is already used by another account.");
+            return View(model);
         }
+
+        employee.Name = model.Name.Trim();
+        var emailResult = await _userManager.SetEmailAsync(user, email);
+        var nameResult = await _userManager.SetUserNameAsync(user, email);
+        if (!emailResult.Succeeded || !nameResult.Succeeded)
+        {
+            foreach (var error in emailResult.Errors.Concat(nameResult.Errors))
+                ModelState.AddModelError(string.Empty, error.Description);
+            return View(model);
+        }
+
+        var currentRoles = await _userManager.GetRolesAsync(user);
+        var removeResult = await _userManager.RemoveFromRolesAsync(user, currentRoles);
+        var addResult = await _userManager.AddToRoleAsync(user, model.Role);
+        if (!removeResult.Succeeded || !addResult.Succeeded)
+        {
+            foreach (var error in removeResult.Errors.Concat(addResult.Errors))
+                ModelState.AddModelError(string.Empty, error.Description);
+            return View(model);
+        }
+
+        employee.IsActive = model.IsActive;
+        var lockoutResult = await _userManager.SetLockoutEnabledAsync(user, true);
+        var lockoutEndResult = await _userManager.SetLockoutEndDateAsync(
+            user, model.IsActive ? DateTimeOffset.UtcNow : DateTimeOffset.MaxValue);
+        if (!lockoutResult.Succeeded || !lockoutEndResult.Succeeded)
+        {
+            foreach (var error in lockoutResult.Errors.Concat(lockoutEndResult.Errors))
+                ModelState.AddModelError(string.Empty, error.Description);
+            return View(model);
+        }
+
+        await _context.SaveChangesAsync();
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ResetPassword(int id)
+    {
+        var exists = await _context.Employees.AnyAsync(e => e.Id == id && e.IdentityUserId != null);
+        return exists ? View(new StaffPasswordViewModel { Id = id }) : NotFound();
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResetPassword(StaffPasswordViewModel model)
+    {
+        if (!ModelState.IsValid) return View(model);
+        var employee = await _context.Employees.Include(e => e.IdentityUser)
+            .FirstOrDefaultAsync(e => e.Id == model.Id);
+        if (employee?.IdentityUser == null) return NotFound();
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(employee.IdentityUser);
+        var result = await _userManager.ResetPasswordAsync(employee.IdentityUser, token, model.NewPassword);
+        if (!result.Succeeded)
+        {
+            foreach (var error in result.Errors)
+                ModelState.AddModelError(nameof(model.NewPassword), error.Description);
+            return View(model);
+        }
+        return RedirectToAction(nameof(Details), new { id = model.Id });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Deactivate(int id)
+    {
+        var employee = await _context.Employees.Include(e => e.IdentityUser)
+            .FirstOrDefaultAsync(e => e.Id == id);
+        if (employee == null) return NotFound();
+
+        employee.IsActive = false;
+        if (employee.IdentityUser != null)
+        {
+            await _userManager.SetLockoutEnabledAsync(employee.IdentityUser, true);
+            await _userManager.SetLockoutEndDateAsync(employee.IdentityUser, DateTimeOffset.MaxValue);
+        }
+        await _context.SaveChangesAsync();
+        return RedirectToAction(nameof(Index));
     }
 }
