@@ -1,0 +1,19 @@
+@model IEnumerable<orderManagementSystem.Models.StaffRowViewModel>
+@foreach (var item in Model)
+{
+    <tr>
+        <td>@item.Name</td><td>@item.Email</td><td>@item.Role</td>
+        <td>@(item.IsActive ? "Active" : "Deactivated")</td>
+        <td>
+            <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
+            <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
+            <a asp-action="ResetPassword" asp-route-id="@item.Id">Reset password</a>
+            @if (item.IsActive)
+            {
+                <form asp-action="Deactivate" asp-route-id="@item.Id" method="post" class="d-inline">
+                    <button type="submit" class="btn btn-link p-0">Deactivate</button>
+                </form>
+            }
+        </td>
+    </tr>
+}
