@@ -1,0 +1,37 @@
+@model IEnumerable<orderManagementSystem.Models.Product> 
+@{ ViewData["Title"] = "Products"; } 
+<h1>Products</h1> 
+
+@if (User.IsInRole("Owner")) 
+{ 
+    <p><a asp-action="Create" class="btn btn-primary">Add Product</a></p> 
+} 
+<label for="productSearch" class="form-label">Live search</label> 
+<input id="productSearch" class="form-control mb-3" type="search" placeholder="Search product, description, or category..." data-url="@Url.Action("Search")" /> 
+<table class="table table-striped" id="productTable"> 
+    <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Availability</th><th></th></tr></thead> 
+    <tbody><partial name="_ProductRows" model="Model" /></tbody> 
+</table> 
+@section Scripts { 
+<script> 
+(() => { 
+    const input = document.getElementById('productSearch'); 
+    const body = document.querySelector('#productTable tbody'); 
+    let timer; 
+    let request; 
+    input.addEventListener('input', () => { 
+        clearTimeout(timer); 
+        timer = setTimeout(async () => { 
+            request?.abort(); 
+            request = new AbortController(); 
+            try { 
+                const response = await fetch(input.dataset.url + '?term=' + encodeURIComponent(input.value), { signal: request.signal }); 
+                if (response.ok) body.innerHTML = await response.text(); 
+            } catch (error) { 
+                if (error.name !== 'AbortError') console.error(error); 
+            } 
+        }, 250); 
+    }); 
+})(); 
+</script> 
+} 
