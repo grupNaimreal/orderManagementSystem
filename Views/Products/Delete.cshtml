@@ -1,0 +1,9 @@
+@model orderManagementSystem.Models.Product 
+@{ ViewData["Title"] = "Retire Product"; } 
+<h1>Retire Product</h1> 
+<p>Retire <strong>@Model.Name</strong> from the active menu? Existing order history will be retained.</p> 
+<form asp-action="Delete" method="post"> 
+    <input type="hidden" name="id" value="@Model.Id" /> 
+    <button class="btn btn-danger" type="submit">Retire Product</button> 
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a> 
+</form> 

@@ -1,0 +1,16 @@
+@model IEnumerable<orderManagementSystem.Models.Product> 
+@foreach (var item in Model) 
+{ 
+    <tr> 
+        <td>@item.Name</td><td>@item.Category?.Name</td><td>@item.Price.ToString("N2")</td> 
+        <td>@(item.IsAvailable ? "Available" : "Unavailable")</td> 
+        <td> 
+            <a asp-action="Details" asp-route-id="@item.Id">Details</a> 
+            @if (User.IsInRole("Owner")) 
+            { 
+                <text> | </text><a asp-action="Edit" asp-route-id="@item.Id">Edit</a> 
+                <text> | </text><a asp-action="Delete" asp-route-id="@item.Id">Retire</a> 
+            } 
+        </td> 
+    </tr> 
+} 
