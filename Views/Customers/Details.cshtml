@@ -1,0 +1,25 @@
+@model orderManagementSystem.Models.Customer
+@{ ViewData["Title"] = "Customer Details"; }
+<h1>Customer Details</h1>
+<dl class="row">
+    <dt class="col-sm-3">Display name</dt><dd class="col-sm-9">@Model.DisplayName</dd>
+    <dt class="col-sm-3">Session</dt><dd class="col-sm-9">@(Model.IsActive ? "Active" : "Ended / Expired")</dd>
+    <dt class="col-sm-3">Created (UTC)</dt><dd class="col-sm-9">@Model.CreatedAtUtc</dd>
+    <dt class="col-sm-3">Last activity (UTC)</dt><dd class="col-sm-9">@Model.LastActivityUtc</dd>
+</dl>
+<h2>Associated Orders</h2>
+<table class="table table-striped">
+    <thead><tr><th>Order ID</th><th>Date</th><th>Total</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    @foreach (var order in Model.Orders.OrderByDescending(o => o.OrderDate))
+    {
+        <tr>
+            <td>@order.Id</td><td>@order.OrderDate</td><td>@order.TotalAmount.ToString("N2")</td>
+            <td>@order.Status</td>
+            <td><a asp-controller="Orders" asp-action="Details" asp-route-id="@order.Id">Details</a></td>
+        </tr>
+    }
+    </tbody>
+</table>
+<a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a>
+<a asp-action="Index" class="btn btn-secondary">Back</a>

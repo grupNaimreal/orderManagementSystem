@@ -43,13 +43,23 @@
         <button class="btn btn-primary" type="submit">Add Option</button> 
     </form> 
 } 
-@if (User.IsInRole("Owner") || User.IsInRole("Employee")) 
-{ 
-    <form asp-action="SetAvailability" method="post" class="mt-3"> 
-        <input type="hidden" name="id" value="@Model.Id" /> 
-        <input type="hidden" name="isAvailable" value="@(!Model.IsAvailable)" /> 
-        <button class="btn btn-outline-primary" type="submit">Mark @(Model.IsAvailable ? "Unavailable" : "Available")</button> 
-    </form> 
-} 
-@if (User.IsInRole("Owner")) { <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-secondary mt-3">Edit Product</a> } 
-<a asp-action="Index" class="btn btn-secondary mt-3">Back to Products</a> 
+@if (User.IsInRole("Owner"))
+{
+    <form asp-action="SetAvailability" method="post" class="mt-3">
+        <input type="hidden" name="id" value="@Model.Id" />
+        <input type="hidden" name="isAvailable" value="@(!Model.IsAvailable)" />
+        <button class="btn btn-outline-primary" type="submit">
+            Mark @(Model.IsAvailable ? "Unavailable" : "Available")
+        </button>
+    </form>
+
+    <a asp-action="Edit"
+       asp-route-id="@Model.Id"
+       class="btn btn-secondary mt-3">
+        Edit Product
+    </a>
+}
+
+<a asp-action="Index" class="btn btn-secondary mt-3">
+    Back to Products
+</a>

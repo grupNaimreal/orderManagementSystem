@@ -1,0 +1,35 @@
+@model orderManagementSystem.Models.Customer
+
+@{
+    ViewData["Title"] = "My Customer Session";
+}
+
+<h1>Your Customer Session</h1>
+
+<p>Welcome, <strong>@Model.DisplayName</strong>.</p>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">Session Status</h5>
+        <p class="text-success">Active</p>
+        <p class="mb-1">
+            <strong>Started:</strong>
+            @Model.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm") UTC
+        </p>
+        <p class="mb-0">
+            Your session expires after 10 minutes of inactivity.
+        </p>
+    </div>
+</div>
+
+<a asp-controller="Products"
+   asp-action="Index"
+   class="btn btn-primary">
+    View Products
+</a>
+
+<form asp-action="EndMySession" method="post" class="mt-3">
+    <button type="submit" class="btn btn-outline-danger">
+        End My Session
+    </button>
+</form>
