@@ -1,56 +1,310 @@
-@model orderManagementSystem.Models.Order
+@using System.Text.Json
+@model orderManagementSystem.Models.OrderCreateViewModel
 
 @{
     ViewData["Title"] = "Create Order";
+    var actionName = Model.IsStaffOrder ? "CreateForCustomer" : "Create";
+    var savedItems = Model.Items.Select(i => new
+    {
+        i.ProductId,
+        i.Quantity,
+        i.VariantOptionId,
+        AddOnOptionIds = i.AddOnOptionIds ?? new List<int>()
+    });
 }
 
 <h1>Create Order</h1>
 
-<hr />
+@if (Model.IsStaffOrder)
+{
+    <p class="text-muted">Create an order on behalf of a customer.</p>
+}
+else
+{
+    <p class="text-muted">Choose your products and customize your order.</p>
+}
 
-<div class="row">
-    <div class="col-md-6">
-        <form asp-action="Create" method="post">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+<form asp-controller="Orders" asp-action="@actionName" method="post">
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
-            <div class="form-group mb-3">
-                <label asp-for="CustomerName" class="control-label"></label>
-                <input asp-for="CustomerName" class="form-control" />
-                <span asp-validation-for="CustomerName" class="text-danger"></span>
+    @if (Model.IsStaffOrder)
+    {
+        <div class="mb-4">
+            <label asp-for="CustomerId" class="form-label">Customer</label>
+            <select asp-for="CustomerId" class="form-select" required>
+                <option value="">Select a customer</option>
+                @foreach (var customer in Model.Customers)
+                {
+                    <option value="@customer.Id">@customer.DisplayName</option>
+                }
+            </select>
+            <span asp-validation-for="CustomerId" class="text-danger"></span>
+        </div>
+    }
+
+    @if (!Model.IsStaffOrder)
+    {
+        <div class="mb-4">
+            <label asp-for="PaymentMethod" class="form-label">
+                Payment Method
+            </label>
+            <select asp-for="PaymentMethod" class="form-select">
+                <option value="Cash">Cash at counter</option>
+                <option value="PayMongo">Pay online (PayMongo)</option>
+            </select>
+            <span asp-validation-for="PaymentMethod" class="text-danger"></span>
+        </div>
+    }
+
+    @if (Model.Products.Count == 0)
+    {
+        <p class="alert alert-warning">
+            There are currently no available products to order.
+        </p>
+    }
+
+    <h2 class="h4">Order Items</h2>
+
+    <div id="order-items"></div>
+
+    <button type="button" id="add-item" class="btn btn-outline-primary mt-2">
+        Add Another Product
+    </button>
+
+    <hr />
+
+    <button type="submit"
+            class="btn btn-primary"
+            disabled="@(Model.Products.Count == 0)">
+        Place Order
+    </button>
+
+    @if (Model.IsStaffOrder)
+    {
+        <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+    }
+    else
+    {
+        <a asp-controller="Products" asp-action="Index"
+           class="btn btn-secondary">Back to Products</a>
+    }
+</form>
+
+<template id="order-item-template">
+    <div class="order-item card mb-3" data-order-row>
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h5 mb-0">Product</h3>
+                <button type="button"
+                        class="btn btn-sm btn-outline-danger remove-item">
+                    Remove
+                </button>
             </div>
 
-            <div class="form-group mb-3">
-                <label asp-for="OrderDate" class="control-label"></label>
-                <input asp-for="OrderDate" type="datetime-local" class="form-control"
-                       value="@Model?.OrderDate.ToString("yyyy-MM-ddTHH:mm")" />
-                <span asp-validation-for="OrderDate" class="text-danger"></span>
-            </div>
-
-            <div class="form-group mb-3">
-                <label asp-for="TotalAmount" class="control-label"></label>
-                <input asp-for="TotalAmount" type="number" step="0.01" class="form-control" />
-                <span asp-validation-for="TotalAmount" class="text-danger"></span>
-            </div>
-
-            <div class="form-group mb-3">
-                <label asp-for="Status" class="control-label"></label>
-                <select asp-for="Status" class="form-control">
-                    <option value="Pending">Pending</option>
-                    <option value="Preparing">Preparing</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Cancelled">Cancelled</option>
+            <div class="mb-3">
+                <label class="form-label">Choose Product</label>
+                <select class="form-select product-select"
+                        name="Items[__index__].ProductId"
+                        required>
+                    <option value="">Select a product</option>
                 </select>
-                <span asp-validation-for="Status" class="text-danger"></span>
             </div>
 
-            <button type="submit" class="btn btn-primary">Create</button>
-            <a asp-action="Index" class="btn btn-secondary">Back to Orders</a>
-        </form>
+            <div class="mb-3">
+                <label class="form-label">Quantity</label>
+                <input type="number"
+                       class="form-control"
+                       name="Items[__index__].Quantity"
+                       min="1"
+                       max="99"
+                       value="1"
+                       required />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Variant (Optional)</label>
+                <select class="form-select variant-select"
+                        name="Items[__index__].VariantOptionId">
+                    <option value="">No variant</option>
+                </select>
+            </div>
+
+            <div class="mb-2">
+                <label class="form-label">Add-ons (Optional)</label>
+                <div class="addons-container">
+                    <span class="text-muted">Choose a product first.</span>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
+</template>
 
 @section Scripts {
-    @{
-        await Html.RenderPartialAsync("_ValidationScriptsPartial");
-    }
+    <partial name="_ValidationScriptsPartial" />
+
+    <script>
+        const products = @Html.Raw(JsonSerializer.Serialize(Model.Products));
+        const savedItems = @Html.Raw(JsonSerializer.Serialize(savedItems));
+
+        const container = document.getElementById("order-items");
+        const template = document.getElementById("order-item-template");
+
+        let nextIndex = 0;
+
+        function formatAdjustment(value) {
+            const amount = Number(value);
+            const sign = amount > 0 ? "+" : "";
+            return sign + "₱" + amount.toFixed(2);
+        }
+
+        function addOption(select, id, name, adjustment, selected) {
+            const option = document.createElement("option");
+            option.value = String(id);
+            option.textContent = name + " (" + formatAdjustment(adjustment) + ")";
+            option.selected = selected;
+            select.appendChild(option);
+        }
+
+        function populateOptions(row, selectedVariant, selectedAddOns) {
+            const productId = Number(row.querySelector(".product-select").value);
+            const product = products.find(p => p.Id === productId);
+
+            const variantSelect = row.querySelector(".variant-select");
+            const addonsContainer = row.querySelector(".addons-container");
+
+            variantSelect.replaceChildren();
+            addonsContainer.replaceChildren();
+
+            const noVariant = document.createElement("option");
+            noVariant.value = "";
+            noVariant.textContent = "No variant";
+            variantSelect.appendChild(noVariant);
+
+            if (!product) {
+                addonsContainer.textContent = "Choose a product first.";
+                return;
+            }
+
+            (product.Variants || []).forEach(variant => {
+                addOption(
+                    variantSelect,
+                    variant.Id,
+                    variant.Name,
+                    variant.PriceAdjustment,
+                    Number(selectedVariant) === variant.Id
+                );
+            });
+
+            if (!product.AddOns || product.AddOns.length === 0) {
+                addonsContainer.textContent = "No add-ons available.";
+                return;
+            }
+
+            (product.AddOns || []).forEach(addOn => {
+                const wrapper = document.createElement("div");
+                wrapper.className = "form-check";
+
+                const input = document.createElement("input");
+                input.type = "checkbox";
+                input.className = "form-check-input";
+                input.name = "Items[" + row.dataset.index + "].AddOnOptionIds";
+                input.value = String(addOn.Id);
+                input.id = "addon-" + row.dataset.index + "-" + addOn.Id;
+                input.checked = selectedAddOns.includes(addOn.Id);
+
+                const label = document.createElement("label");
+                label.className = "form-check-label";
+                label.htmlFor = input.id;
+                label.textContent =
+                    addOn.Name + " (" + formatAdjustment(addOn.PriceAdjustment) + ")";
+
+                wrapper.append(input, label);
+                addonsContainer.appendChild(wrapper);
+            });
+        }
+
+        function renumberRows() {
+            const rows = container.querySelectorAll("[data-order-row]");
+
+            rows.forEach((row, index) => {
+                row.dataset.index = index;
+
+                row.querySelectorAll("[name]").forEach(input => {
+                    input.name = input.name.replace(
+                        /Items\[\d+\]/g,
+                        "Items[" + index + "]"
+                    );
+                });
+
+                row.querySelectorAll(".addons-container input").forEach(input => {
+                    input.id = input.id.replace(/addon-\d+-/, "addon-" + index + "-");
+                });
+
+                row.querySelectorAll(".addons-container label").forEach(label => {
+                    label.htmlFor = label.htmlFor.replace(
+                        /addon-\d+-/,
+                        "addon-" + index + "-"
+                    );
+                });
+            });
+
+            nextIndex = rows.length;
+        }
+
+        function addRow(saved = {}) {
+            const fragment = template.content.cloneNode(true);
+            const row = fragment.querySelector("[data-order-row]");
+            const index = nextIndex++;
+
+            row.dataset.index = index;
+
+            row.querySelectorAll("[name]").forEach(input => {
+                input.name = input.name.replaceAll("__index__", index);
+            });
+
+            const productSelect = row.querySelector(".product-select");
+
+            products.forEach(product => {
+                const option = document.createElement("option");
+                option.value = String(product.Id);
+                option.textContent =
+                    product.Name + " — ₱" + Number(product.BasePrice).toFixed(2);
+                productSelect.appendChild(option);
+            });
+
+            productSelect.value = saved.ProductId
+                ? String(saved.ProductId)
+                : "";
+
+            row.querySelector('input[type="number"]').value =
+                saved.Quantity || 1;
+
+            populateOptions(
+                row,
+                saved.VariantOptionId,
+                (saved.AddOnOptionIds || []).map(Number)
+            );
+
+            productSelect.addEventListener("change", () => {
+                populateOptions(row, null, []);
+            });
+
+            row.querySelector(".remove-item").addEventListener("click", () => {
+                row.remove();
+                renumberRows();
+            });
+
+            container.appendChild(row);
+        }
+
+        document.getElementById("add-item").addEventListener("click", () => {
+            addRow();
+        });
+
+        if (savedItems.length > 0) {
+            savedItems.forEach(item => addRow(item));
+        } else {
+            addRow();
+        }
+    </script>
 }

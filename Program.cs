@@ -33,6 +33,8 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options =>
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 
+builder.Services.AddHttpClient<PayMongoService>();
+builder.Services.AddHostedService<UnpaidOrderExpiryService>();
 
 var app = builder.Build();
 
@@ -55,6 +57,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
+
+app.MapControllers();
 
 app.MapControllerRoute(
     name: "default",

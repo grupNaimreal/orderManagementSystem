@@ -8,7 +8,7 @@ public class Customer
 
     [Required]
     [StringLength(30, MinimumLength = 2)]
-    [RegularExpression(@"^[\p{L}\p{N}][\p{L}\p{N} .'-]*$",
+    [RegularExpression(@"^[A-Za-z0-9][A-Za-z0-9 .'-]*$",
         ErrorMessage = "Use 2-30 letters, numbers, spaces, periods, apostrophes, or hyphens.")]
     [Display(Name = "Customer Name")]
     public string DisplayName { get; set; } = string.Empty;

@@ -66,6 +66,7 @@ public class CustomerSessionService
         return customer;
     }
 
+    
     public async Task<Customer> BeginSessionAsync(string displayName)
     {
         if (string.IsNullOrWhiteSpace(displayName))
@@ -78,19 +79,46 @@ public class CustomerSessionService
 
         var currentId = httpContext.Session.GetInt32(CustomerIdKey);
 
-        var duplicate = await _context.Customers.AnyAsync(c =>
-            c.IsActive &&
-            c.Id != currentId &&
-            c.DisplayName.ToLower() == displayName.ToLower());
+        // Reuse the current session if the name is unchanged.
+        if (currentId != null)
+        {
+            var currentCustomer = await _context.Customers
+                .FirstOrDefaultAsync(c => c.Id == currentId && c.IsActive);
 
-        if (duplicate)
-            throw new InvalidOperationException(
-                "That display name is already in use.");
+            if (currentCustomer != null &&
+                currentCustomer.DisplayName.Equals(
+                    displayName, StringComparison.OrdinalIgnoreCase))
+            {
+                currentCustomer.LastActivityUtc = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                return currentCustomer;
+            }
 
-        await EndSessionAsync();
+            await EndSessionAsync();
+        }
 
         var now = DateTime.UtcNow;
+        var cutoff = now.AddMinutes(-InactivityMinutes);
 
+        // Resume a recently inactive customer within the 10-minute window.
+        var returningCustomer = await _context.Customers
+            .Where(c =>
+                c.DisplayName.ToLower() == displayName.ToLower() &&
+                c.LastActivityUtc >= cutoff)
+            .OrderByDescending(c => c.LastActivityUtc)
+            .FirstOrDefaultAsync();
+
+        if (returningCustomer != null)
+        {
+            returningCustomer.IsActive = true;
+            returningCustomer.LastActivityUtc = now;
+            await _context.SaveChangesAsync();
+
+            httpContext.Session.SetInt32(CustomerIdKey, returningCustomer.Id);
+            return returningCustomer;
+        }
+
+        // No recent record: create a fresh customer.
         var customer = new Customer
         {
             DisplayName = displayName,
@@ -106,6 +134,7 @@ public class CustomerSessionService
 
         return customer;
     }
+
 
     public async Task EndSessionAsync()
     {
