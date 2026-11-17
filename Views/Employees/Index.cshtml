@@ -1,5 +1,7 @@
 @model IEnumerable<orderManagementSystem.Models.StaffRowViewModel>
-@{ ViewData["Title"] = "Staff Accounts"; }
+@{
+    ViewData["Title"] = "Staff Accounts";
+}
 <h1>Staff Accounts</h1>
 @if (TempData["StaffError"] != null)
 {
@@ -7,21 +9,23 @@
         @TempData["StaffError"]
     </div>
 }
-<p><a asp-action="Create" class="btn btn-primary">Create Staff Account</a></p>
+<p><a asp-action="Create" class="btn btn-primary w-100 w-sm-auto">Create Staff Account</a></p>
 <input id="staffSearch" class="form-control mb-3" type="search" placeholder="Search name, email, or role..." data-url="@Url.Action("Search")" />
-<table class="table table-striped" id="staffTable">
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Employee Code</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Status</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody><partial name="_EmployeeRows" model="Model" /></tbody>
-</table>
+<div class="table-responsive">
+    <table class="table table-striped stack-table" id="staffTable">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Employee Code</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody><partial name="_EmployeeRows" model="Model" /></tbody>
+    </table>
+</div>
 @section Scripts {
 <script>
 (() => {

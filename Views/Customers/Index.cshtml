@@ -1,17 +1,21 @@
 @model IEnumerable<orderManagementSystem.Models.Customer>
-@{ ViewData["Title"] = "Customer Accounts"; }
+@{
+    ViewData["Title"] = "Customer Accounts";
+}
 <h1>Customer Accounts</h1>
-<p><a asp-action="Create" class="btn btn-primary">Create Customer Session</a></p>
+<p><a asp-action="Create" class="btn btn-primary w-100 w-sm-auto">Create Customer Session</a></p>
 <div class="mb-3">
     <label for="customerSearch" class="form-label">Live search</label>
     <input id="customerSearch" class="form-control" type="search"
            placeholder="Search customer display names..."
            data-search-url="@Url.Action("Search")" />
 </div>
-<table class="table table-striped" id="customerTable">
-    <thead><tr><th>Name</th><th>Session</th><th>Last Activity (UTC)</th><th>Actions</th></tr></thead>
-    <tbody><partial name="_CustomerRows" model="Model" /></tbody>
-</table>
+<div class="table-responsive">
+    <table class="table table-striped stack-table" id="customerTable">
+        <thead><tr><th>Name</th><th>Session</th><th>Last Activity (UTC)</th><th>Actions</th></tr></thead>
+        <tbody><partial name="_CustomerRows" model="Model" /></tbody>
+    </table>
+</div>
 @section Scripts {
 <script>
 (() => {
