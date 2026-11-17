@@ -1,31 +1,145 @@
 html {
-  font-size: 14px;
+    font-size: 14px;
+    position: relative;
+    min-height: 100%;
 }
 
 @media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
-  position: relative;
-  min-height: 100%;
+    html {
+        font-size: 16px;
+    }
 }
 
 body {
-  margin-bottom: 60px;
+    margin-bottom: 60px;
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    transition: background-color .2s ease, color .2s ease;
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
+.btn:focus,
+.btn:active:focus,
+.btn-link.nav-link:focus,
+.form-control:focus,
+.form-check-input:focus {
+    box-shadow: 0 0 0 0.1rem var(--bs-body-bg), 0 0 0 0.25rem #258cfb;
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-  text-align: start;
+.form-floating > .form-control-plaintext::placeholder,
+.form-floating > .form-control::placeholder {
+    color: var(--bs-secondary-color);
+    text-align: end;
+}
+
+.form-floating > .form-control-plaintext:focus::placeholder,
+.form-floating > .form-control:focus::placeholder {
+    text-align: start;
+}
+
+/* Navbar */
+.navbar {
+    background-color: var(--bs-tertiary-bg) !important;
+    border-color: var(--bs-border-color) !important;
+}
+
+.navbar-brand,
+.navbar .nav-link {
+    color: var(--bs-emphasis-color) !important;
+}
+
+.navbar .nav-link:hover {
+    color: var(--bs-primary) !important;
+}
+
+.navbar-toggler {
+    border-color: var(--bs-border-color);
+}
+
+.navbar-toggler-icon {
+    filter: var(--navbar-toggler-filter, none);
+}
+
+[data-theme="dark"] .navbar-toggler-icon {
+    filter: invert(1);
+}
+
+/* General surfaces */
+.card,
+.dropdown-menu,
+.modal-content {
+    background-color: var(--bs-tertiary-bg);
+    color: var(--bs-body-color);
+    border-color: var(--bs-border-color);
+}
+
+.table {
+    --bs-table-color: var(--bs-body-color);
+    --bs-table-bg: transparent;
+    --bs-table-border-color: var(--bs-border-color);
+}
+
+.form-control,
+.form-select {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border-color: var(--bs-border-color);
+}
+
+.form-control::placeholder {
+    color: var(--bs-secondary-color);
+}
+
+footer {
+    background-color: var(--bs-body-bg);
+    border-color: var(--bs-border-color) !important;
+}
+
+footer,
+footer a {
+    color: var(--bs-secondary-color);
+}
+
+/* Product menu */
+.menu-heading,
+.product-name {
+    color: var(--bs-emphasis-color) !important;
+}
+
+.product-card {
+    background-color: var(--bs-tertiary-bg) !important;
+    border-color: var(--bs-border-color) !important;
+}
+
+.product-image,
+.product-placeholder {
+    background-color: var(--bs-secondary-bg) !important;
+}
+
+.product-placeholder {
+    color: var(--bs-secondary-color) !important;
+}
+
+.product-price {
+    color: var(--bs-emphasis-color) !important;
+}
+
+.menu-btn {
+    background-color: #3b2921;
+    color: white;
+    border: none;
+}
+
+.menu-btn:hover {
+    background-color: #604536;
+    color: white;
+}
+
+[data-theme="dark"] .menu-btn {
+    background-color: #d5a66b;
+    color: #241a15;
+}
+
+[data-theme="dark"] .menu-btn:hover {
+    background-color: #e5bb89;
+    color: #241a15;
 }

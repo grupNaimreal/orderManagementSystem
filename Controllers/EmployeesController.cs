@@ -18,6 +18,29 @@ public class EmployeesController : Controller
         _context = context;
         _userManager = userManager;
     }
+    private async Task<bool> HasOtherActiveOwnerAsync(int excludedEmployeeId)
+    {
+        var otherActiveEmployees = await _context.Employees
+            .AsNoTracking()
+            .Include(e => e.IdentityUser)
+            .Where(e => e.IsActive
+                && e.Id != excludedEmployeeId
+                && e.IdentityUserId != null)
+            .ToListAsync();
+
+        foreach (var otherEmployee in otherActiveEmployees)
+        {
+            if (otherEmployee.IdentityUser == null)
+                continue;
+
+            var roles = await _userManager.GetRolesAsync(otherEmployee.IdentityUser);
+
+            if (roles.Contains("Owner"))
+                return true;
+        }
+
+        return false;
+    }
 
     private async Task<List<StaffRowViewModel>> GetRowsAsync()
     {
@@ -37,6 +60,7 @@ public class EmployeesController : Controller
             {
                 Id = employee.Id,
                 Name = employee.Name,
+                EmployeeCode = employee.EmployeeCode,
                 Email = user.Email ?? user.UserName ?? "",
                 Role = string.Join(", ", roles),
                 IsActive = employee.IsActive
@@ -115,7 +139,10 @@ public class EmployeesController : Controller
             {
                 Name = model.Name.Trim(),
                 IdentityUserId = user.Id,
-                IsActive = true
+                IsActive = true,
+                EmployeeCode = string.IsNullOrWhiteSpace(model.EmployeeCode)
+                    ? null
+                    : model.EmployeeCode.Trim()
             });
             await _context.SaveChangesAsync();
         }
@@ -146,6 +173,7 @@ public class EmployeesController : Controller
         {
             Id = employee.Id,
             Name = employee.Name,
+            EmployeeCode = employee.EmployeeCode,
             Email = employee.IdentityUser.Email ?? "",
             Role = roles.FirstOrDefault() ?? "Employee",
             IsActive = employee.IsActive
@@ -156,51 +184,118 @@ public class EmployeesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(StaffEditViewModel model)
     {
-        if (!ModelState.IsValid) return View(model);
-        var employee = await _context.Employees.Include(e => e.IdentityUser)
+        if (!ModelState.IsValid)
+            return View(model);
+
+        var employee = await _context.Employees
+            .Include(e => e.IdentityUser)
             .FirstOrDefaultAsync(e => e.Id == model.Id);
-        if (employee?.IdentityUser == null) return NotFound();
+
+        if (employee?.IdentityUser == null)
+            return NotFound();
+
         var user = employee.IdentityUser;
         var email = model.Email.Trim();
+
         var duplicate = await _userManager.FindByEmailAsync(email);
+
         if (duplicate != null && duplicate.Id != user.Id)
         {
-            ModelState.AddModelError(nameof(model.Email), "That email is already used by another account.");
-            return View(model);
-        }
+            ModelState.AddModelError(
+                nameof(model.Email),
+                "That email is already used by another account.");
 
-        employee.Name = model.Name.Trim();
-        var emailResult = await _userManager.SetEmailAsync(user, email);
-        var nameResult = await _userManager.SetUserNameAsync(user, email);
-        if (!emailResult.Succeeded || !nameResult.Succeeded)
-        {
-            foreach (var error in emailResult.Errors.Concat(nameResult.Errors))
-                ModelState.AddModelError(string.Empty, error.Description);
             return View(model);
         }
 
         var currentRoles = await _userManager.GetRolesAsync(user);
-        var removeResult = await _userManager.RemoveFromRolesAsync(user, currentRoles);
-        var addResult = await _userManager.AddToRoleAsync(user, model.Role);
-        if (!removeResult.Succeeded || !addResult.Succeeded)
+
+        var isCurrentlyActiveOwner =
+            employee.IsActive && currentRoles.Contains("Owner");
+
+        var willRemainActiveOwner =
+            model.IsActive && model.Role == "Owner";
+
+        if (isCurrentlyActiveOwner
+            && !willRemainActiveOwner
+            && !await HasOtherActiveOwnerAsync(employee.Id))
         {
-            foreach (var error in removeResult.Errors.Concat(addResult.Errors))
-                ModelState.AddModelError(string.Empty, error.Description);
+            ModelState.AddModelError(
+                string.Empty,
+                "You cannot demote or deactivate the last active Owner account.");
+
             return View(model);
         }
+
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync();
+
+        async Task<IActionResult> RollbackWithErrors(
+            IEnumerable<IdentityError> errors)
+        {
+            await transaction.RollbackAsync();
+
+            foreach (var error in errors)
+                ModelState.AddModelError(string.Empty, error.Description);
+
+            return View(model);
+        }
+
+        var emailResult = await _userManager.SetEmailAsync(user, email);
+
+        if (!emailResult.Succeeded)
+            return await RollbackWithErrors(emailResult.Errors);
+
+        var usernameResult = await _userManager.SetUserNameAsync(user, email);
+
+        if (!usernameResult.Succeeded)
+            return await RollbackWithErrors(usernameResult.Errors);
+
+        var removeResult =
+            await _userManager.RemoveFromRolesAsync(user, currentRoles);
+
+        if (!removeResult.Succeeded)
+            return await RollbackWithErrors(removeResult.Errors);
+
+        var addResult =
+            await _userManager.AddToRoleAsync(user, model.Role);
+
+        if (!addResult.Succeeded)
+            return await RollbackWithErrors(addResult.Errors);
+
+        var lockoutResult =
+            await _userManager.SetLockoutEnabledAsync(user, true);
+
+        if (!lockoutResult.Succeeded)
+            return await RollbackWithErrors(lockoutResult.Errors);
+
+        var lockoutEndResult =
+            await _userManager.SetLockoutEndDateAsync(
+                user,
+                model.IsActive
+                    ? DateTimeOffset.UtcNow
+                    : DateTimeOffset.MaxValue);
+
+        if (!lockoutEndResult.Succeeded)
+            return await RollbackWithErrors(lockoutEndResult.Errors);
+
+        var stampResult = await _userManager.UpdateSecurityStampAsync(user);
+
+        if (!stampResult.Succeeded)
+            return await RollbackWithErrors(stampResult.Errors);
+
+        employee.Name = model.Name.Trim();
+
+        employee.EmployeeCode =
+            string.IsNullOrWhiteSpace(model.EmployeeCode)
+                ? null
+                : model.EmployeeCode.Trim();
 
         employee.IsActive = model.IsActive;
-        var lockoutResult = await _userManager.SetLockoutEnabledAsync(user, true);
-        var lockoutEndResult = await _userManager.SetLockoutEndDateAsync(
-            user, model.IsActive ? DateTimeOffset.UtcNow : DateTimeOffset.MaxValue);
-        if (!lockoutResult.Succeeded || !lockoutEndResult.Succeeded)
-        {
-            foreach (var error in lockoutResult.Errors.Concat(lockoutEndResult.Errors))
-                ModelState.AddModelError(string.Empty, error.Description);
-            return View(model);
-        }
 
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
         return RedirectToAction(nameof(Index));
     }
 
@@ -235,17 +330,59 @@ public class EmployeesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Deactivate(int id)
     {
-        var employee = await _context.Employees.Include(e => e.IdentityUser)
+        var employee = await _context.Employees
+            .Include(e => e.IdentityUser)
             .FirstOrDefaultAsync(e => e.Id == id);
-        if (employee == null) return NotFound();
+
+        if (employee?.IdentityUser == null)
+            return NotFound();
+
+        var user = employee.IdentityUser;
+        var roles = await _userManager.GetRolesAsync(user);
+
+        if (employee.IsActive
+            && roles.Contains("Owner")
+            && !await HasOtherActiveOwnerAsync(employee.Id))
+        {
+            TempData["StaffError"] =
+                "You cannot deactivate the last active Owner account.";
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync();
+
+        var lockoutResult =
+            await _userManager.SetLockoutEnabledAsync(user, true);
+
+        var lockoutEndResult =
+            await _userManager.SetLockoutEndDateAsync(
+                user, DateTimeOffset.MaxValue);
+
+        var stampResult =
+            await _userManager.UpdateSecurityStampAsync(user);
+
+        var errors = lockoutResult.Errors
+            .Concat(lockoutEndResult.Errors)
+            .Concat(stampResult.Errors)
+            .ToList();
+
+        if (errors.Count > 0)
+        {
+            await transaction.RollbackAsync();
+
+            TempData["StaffError"] =
+                string.Join(" ", errors.Select(e => e.Description));
+
+            return RedirectToAction(nameof(Index));
+        }
 
         employee.IsActive = false;
-        if (employee.IdentityUser != null)
-        {
-            await _userManager.SetLockoutEnabledAsync(employee.IdentityUser, true);
-            await _userManager.SetLockoutEndDateAsync(employee.IdentityUser, DateTimeOffset.MaxValue);
-        }
+
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
         return RedirectToAction(nameof(Index));
     }
 }

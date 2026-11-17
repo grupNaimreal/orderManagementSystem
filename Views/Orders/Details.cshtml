@@ -2,25 +2,207 @@
 
 @{
     ViewData["Title"] = "Order Details";
+    var isStaff = User.IsInRole("Owner") || User.IsInRole("Employee");
 }
 
-<h1>Order Details</h1>
+<h1>Order #@Model.Id</h1>
 
-<hr />
+<div class="card mb-4">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Customer</dt>
+            <dd class="col-sm-9">@Model.CustomerName</dd>
 
-<dl class="row">
-    <dt class="col-sm-3">Customer Name</dt>
-    <dd class="col-sm-9">@Model.CustomerName</dd>
+            <dt class="col-sm-3">Order Date</dt>
+            <dd class="col-sm-9">@TimeZoneInfo.ConvertTimeFromUtc(
+                DateTime.SpecifyKind(Model.OrderDate, DateTimeKind.Utc),
+                TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila")
+            ).ToString("MMM dd, yyyy hh:mm tt")</dd>
 
-    <dt class="col-sm-3">Order Date</dt>
-    <dd class="col-sm-9">@Model.OrderDate.ToString("MMM dd, yyyy hh:mm tt")</dd>
+            <dt class="col-sm-3">Status</dt>
+            <dd class="col-sm-9">
+                <span class="badge bg-primary">@Model.Status</span>
+            </dd>
 
-    <dt class="col-sm-3">Total Amount</dt>
-    <dd class="col-sm-9">@Model.TotalAmount.ToString("N2")</dd>
+            <dt class="col-sm-3">Payment Method</dt>
+            <dd class="col-sm-9">@Model.PaymentMethod</dd>
 
-    <dt class="col-sm-3">Status</dt>
-    <dd class="col-sm-9">@Model.Status</dd>
-</dl>
+            <dt class="col-sm-3">Payment Status</dt>
+            <dd class="col-sm-9">
+                <span class="badge bg-secondary">@Model.PaymentStatus</span>
+            </dd>
+        </dl>
+    </div>
+</div>
 
-<a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a>
-<a asp-action="Index" class="btn btn-secondary">Back to Orders</a>
+@if (TempData["PaymentError"] is string paymentError)
+{
+    <div class="alert alert-warning">@paymentError</div>
+}
+
+@if (isStaff
+    && Model.PaymentMethod == "Cash"
+    && Model.PaymentStatus == "Pending"
+    && Model.Status == "Pending")
+{
+    <form asp-action="MarkCashPaid" method="post" class="mb-4">
+        <input type="hidden" name="id" value="@Model.Id" />
+        <button type="submit" class="btn btn-success">
+            Confirm Cash Received
+        </button>
+    </form>
+}
+
+@if (!isStaff
+    && Model.PaymentMethod == "PayMongo"
+    && Model.PaymentStatus == "Pending")
+{
+    <div class="alert alert-info mb-4">
+        <strong>Payment is not confirmed yet.</strong>
+        Complete checkout and wait for payment verification.
+        @if (!string.IsNullOrWhiteSpace(Model.PayMongoCheckoutUrl))
+        {
+            <div class="mt-2">
+                <a href="@Model.PayMongoCheckoutUrl"
+                   class="btn btn-primary">
+                    Continue PayMongo Checkout
+                </a>
+            </div>
+        }
+        else
+        {
+            <form asp-action="StartPayMongoCheckout"
+                  asp-route-id="@Model.Id"
+                  method="post"
+                  class="mt-2">
+                <button type="submit" class="btn btn-primary">
+                    Retry Online Checkout
+                </button>
+            </form>
+        }
+    </div>
+}
+
+<h2 class="h4">Order Items</h2>
+
+@if (Model.Items.Any())
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Base Price</th>
+                    <th>Selected Options</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Items)
+                {
+                    <tr>
+                        <td>@item.ProductNameSnapshot</td>
+                        <td>₱@item.BaseUnitPrice.ToString("N2")</td>
+                        <td>
+                            @if (item.SelectedOptions.Any())
+                            {
+                                <ul class="mb-0 ps-3">
+                                    @foreach (var option in item.SelectedOptions)
+                                    {
+                                        <li>
+                                            @option.NameSnapshot
+                                            (@option.OptionType):
+                                            ₱@option.PriceAdjustment.ToString("N2")
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                            else
+                            {
+                                <span class="text-muted">None</span>
+                            }
+                        </td>
+                        <td>@item.Quantity</td>
+                        <td>₱@item.UnitPrice.ToString("N2")</td>
+                        <td>₱@item.LineTotal.ToString("N2")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <p class="text-muted">No order items were recorded.</p>
+}
+
+<div class="text-end mb-4">
+    <h3>Total: ₱@Model.TotalAmount.ToString("N2")</h3>
+</div>
+
+@if (isStaff)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5">Manage Order Status</h2>
+
+            @if (Model.Status == "Pending" || Model.Status == "Preparing")
+            {
+                <form asp-action="UpdateStatus" method="post">
+                    <input type="hidden" name="id" value="@Model.Id" />
+
+                    <div class="mb-3">
+                        <label for="status" class="form-label">
+                            New Status
+                        </label>
+
+                        <select id="status" name="status" class="form-select">
+                            @if (Model.Status == "Pending")
+                            {
+                                @if (Model.PaymentStatus != "Pending")
+                                {
+                                    <option value="Preparing">Preparing</option>
+                                }
+                                <option value="Cancelled">Cancelled</option>
+                            }
+                            else
+                            {
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                            }
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        Update Status
+                    </button>
+                </form>
+            }
+            else
+            {
+                <p class="text-muted mb-0">
+                    This order has reached a final status.
+                </p>
+            }
+
+            @if (TempData["OrderError"] != null)
+            {
+                <p class="text-danger mt-3 mb-0">
+                    @TempData["OrderError"]
+                </p>
+            }
+        </div>
+    </div>
+
+    <a asp-action="Index" class="btn btn-secondary">
+        Back to Orders
+    </a>
+}
+else
+{
+    <a asp-action="MyOrders" class="btn btn-secondary">
+        Back to My Orders
+    </a>
+}

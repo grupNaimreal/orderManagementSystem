@@ -5,6 +5,7 @@
     <input asp-for="Id" type="hidden" />
     <div asp-validation-summary="ModelOnly" class="text-danger"></div>
     <div class="mb-3"><label asp-for="Name"></label><input asp-for="Name" class="form-control" /><span asp-validation-for="Name" class="text-danger"></span></div>
+    <div class="form-group"><label asp-for="EmployeeCode" class="control-label"></label><input asp-for="EmployeeCode" class="form-control" maxlength="30" /><span asp-validation-for="EmployeeCode" class="text-danger"></span></div>
     <div class="mb-3"><label asp-for="Email"></label><input asp-for="Email" class="form-control" /><span asp-validation-for="Email" class="text-danger"></span></div>
     <div class="mb-3"><label asp-for="Role"></label><select asp-for="Role" class="form-select"><option>Employee</option><option>Owner</option></select><span asp-validation-for="Role" class="text-danger"></span></div>
     <div class="form-check mb-3"><input asp-for="IsActive" class="form-check-input" /><label asp-for="IsActive" class="form-check-label">Account is active</label></div>

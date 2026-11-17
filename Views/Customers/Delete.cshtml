@@ -1,0 +1,9 @@
+@model orderManagementSystem.Models.Customer
+@{ ViewData["Title"] = "End Customer Session"; }
+<h1>End Customer Session</h1>
+<p>End the active session for <strong>@Model.DisplayName</strong>? The customer record and associated orders will be retained.</p>
+<form asp-action="Delete" method="post">
+    <input type="hidden" asp-for="Id" />
+    <button type="submit" class="btn btn-danger">End Session</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>

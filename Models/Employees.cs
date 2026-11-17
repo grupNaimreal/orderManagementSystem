@@ -7,6 +7,10 @@ public class Employees
 {
     public int Id { get; set; }
 
+    [StringLength(30)]
+    [Display(Name = "Employee Code")]
+    public string? EmployeeCode { get; set; }
+
     [Required]
     [StringLength(100, MinimumLength = 2)]
     public string Name { get; set; } = string.Empty;
