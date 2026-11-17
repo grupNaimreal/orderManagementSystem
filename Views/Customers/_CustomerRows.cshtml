@@ -2,10 +2,10 @@
 @foreach (var item in Model)
 {
     <tr>
-        <td>@item.DisplayName</td>
-        <td>@(item.IsActive ? "Active" : "Ended / Expired")</td>
-        <td>@item.LastActivityUtc.ToString("yyyy-MM-dd HH:mm")</td>
-        <td>
+        <td data-label="Name">@item.DisplayName</td>
+        <td data-label="Session">@(item.IsActive ? "Active" : "Ended / Expired")</td>
+        <td data-label="Last Activity">@item.LastActivityUtc.ToString("yyyy-MM-dd HH:mm")</td>
+        <td data-label="Actions">
             <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
             <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
             @if (item.IsActive)

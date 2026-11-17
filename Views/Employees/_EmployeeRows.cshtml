@@ -2,12 +2,12 @@
 @foreach (var item in Model)
 {
     <tr>
-        <td>@item.Name</td>
-        <td>@(string.IsNullOrWhiteSpace(item.EmployeeCode) ? "Not provided" : item.EmployeeCode)</td>
-        <td>@item.Email</td>
-        <td>@item.Role</td>
-        <td>@(item.IsActive ? "Active" : "Deactivated")</td>
-        <td>
+        <td data-label="Name">@item.Name</td>
+        <td data-label="Employee Code">@(string.IsNullOrWhiteSpace(item.EmployeeCode) ? "Not provided" : item.EmployeeCode)</td>
+        <td data-label="Email">@item.Email</td>
+        <td data-label="Role">@item.Role</td>
+        <td data-label="Status">@(item.IsActive ? "Active" : "Deactivated")</td>
+        <td data-label="Actions">
             <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
             <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
             <a asp-action="ResetPassword" asp-route-id="@item.Id">Reset password</a>

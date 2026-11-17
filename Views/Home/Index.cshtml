@@ -1,4 +1,3 @@
-﻿
 @{
     ViewData["Title"] = "Home";
 }
@@ -56,9 +55,24 @@
         color: #3b2921;
         font-weight: 750;
     }
+
+    @@media (max-width: 575.98px) {
+        .bean-hero {
+            padding: 28px 20px;
+            border-radius: 14px;
+        }
+
+        .bean-hero h1 {
+            letter-spacing: -1px;
+        }
+
+        .bean-btn {
+            width: 100%;
+        }
+    }
 </style>
 
-<div class="container py-4">
+<div class="py-3 py-md-4">
     <section class="bean-hero mb-5">
         <div class="row align-items-center">
             <div class="col-lg-8">

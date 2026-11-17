@@ -1,4 +1,3 @@
-
 @model IEnumerable<orderManagementSystem.Models.Product>
 
 @if (!Model.Any())
@@ -11,7 +10,7 @@
 
 @foreach (var item in Model)
 {
-    <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+    <div class="col-12 col-md-6 col-lg-4 col-xl-3">
         <div class="product-card">
             @if (!string.IsNullOrWhiteSpace(item.ImageUrl))
             {
