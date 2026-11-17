@@ -1,0 +1,17 @@
+@model IEnumerable<orderManagementSystem.Models.Customer>
+@foreach (var item in Model)
+{
+    <tr>
+        <td>@item.DisplayName</td>
+        <td>@(item.IsActive ? "Active" : "Ended / Expired")</td>
+        <td>@item.LastActivityUtc.ToString("yyyy-MM-dd HH:mm")</td>
+        <td>
+            <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
+            <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
+            @if (item.IsActive)
+            {
+                <a asp-action="Delete" asp-route-id="@item.Id">End Session</a>
+            }
+        </td>
+    </tr>
+}

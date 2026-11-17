@@ -1,0 +1,14 @@
+@model orderManagementSystem.Models.Customer
+@{ ViewData["Title"] = "Create Customer Session"; }
+<h1>Create Customer Session</h1>
+<form asp-action="Create" method="post">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div class="mb-3">
+        <label asp-for="DisplayName" class="form-label"></label>
+        <input asp-for="DisplayName" class="form-control" maxlength="30" />
+        <span asp-validation-for="DisplayName" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Create</button>
+    <a asp-controller="Products" asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }
