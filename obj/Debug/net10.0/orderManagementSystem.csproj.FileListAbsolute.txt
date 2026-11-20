@@ -363,9 +363,7 @@
 /workspaces/orderManagementSystem/obj/Debug/net10.0/compressed/nezrqnk58p-{0}-muycvpuwrr-muycvpuwrr.gz
 /workspaces/orderManagementSystem/obj/Debug/net10.0/compressed/v0zgfp0y55-{0}-87fc7y1x7t-87fc7y1x7t.gz
 /workspaces/orderManagementSystem/obj/Debug/net10.0/compressed/yfc7ypekbg-{0}-mlv21k5csn-mlv21k5csn.gz
-/workspaces/orderManagementSystem/obj/Debug/net10.0/compressed/b4ppxi22fh-{0}-b9sayid5wm-b9sayid5wm.gz
 /workspaces/orderManagementSystem/obj/Debug/net10.0/compressed/hoos0udozw-{0}-61n19gt1b8-61n19gt1b8.gz
-/workspaces/orderManagementSystem/obj/Debug/net10.0/compressed/zvlg36ia17-{0}-xtxxf3hu2r-xtxxf3hu2r.gz
 /workspaces/orderManagementSystem/obj/Debug/net10.0/compressed/3n885a55ic-{0}-bqjiyaj88i-bqjiyaj88i.gz
 /workspaces/orderManagementSystem/obj/Debug/net10.0/compressed/sgfmedwepc-{0}-c2jlpeoesf-c2jlpeoesf.gz
 /workspaces/orderManagementSystem/obj/Debug/net10.0/compressed/phbfkkersk-{0}-erw9l3u2r3-erw9l3u2r3.gz
@@ -438,3 +436,5 @@
 /workspaces/orderManagementSystem/obj/Debug/net10.0/orderManagementSystem.pdb
 /workspaces/orderManagementSystem/obj/Debug/net10.0/orderManagementSystem.genruntimeconfig.cache
 /workspaces/orderManagementSystem/obj/Debug/net10.0/ref/orderManagementSystem.dll
+/workspaces/orderManagementSystem/obj/Debug/net10.0/compressed/b4ppxi22fh-{0}-tba4jzgrcs-tba4jzgrcs.gz
+/workspaces/orderManagementSystem/obj/Debug/net10.0/compressed/zvlg36ia17-{0}-9006v8wllj-9006v8wllj.gz
