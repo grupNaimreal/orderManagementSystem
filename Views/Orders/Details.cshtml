@@ -40,6 +40,8 @@
     <div class="alert alert-warning">@paymentError</div>
 }
 
+@if (TempData["PaymentNotice"] is string paymentNotice) { <div class="alert alert-info">@paymentNotice</div> }
+
 @if (isStaff
     && Model.PaymentMethod == "Cash"
     && Model.PaymentStatus == "Pending"
@@ -161,7 +163,7 @@ else
                         <select id="status" name="status" class="form-select">
                             @if (Model.Status == "Pending")
                             {
-                                @if (Model.PaymentStatus != "Pending")
+                                @if (Model.PaymentStatus == "Paid" || Model.PaymentStatus == "NotTracked")
                                 {
                                     <option value="Preparing">Preparing</option>
                                 }
