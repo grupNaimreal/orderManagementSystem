@@ -6,3 +6,6 @@ app-local.db-wal
 *.user
 *.suo
 .vscode/
+
+bin/
+obj/
