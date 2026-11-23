@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-label="QRDER Logo">
+  <!-- Upper dark espresso frame -->
+  <path d="M 180 565 L 180 195 L 740 195 L 740 395"
+        fill="none"
+        stroke="#4A1C05"
+        stroke-width="115"
+        stroke-linecap="round"
+        stroke-linejoin="round" />
+  <!-- Lower dark espresso frame -->
+  <path d="M 740 535 L 740 775 L 180 775 L 180 705"
+        fill="none"
+        stroke="#4A1C05"
+        stroke-width="115"
+        stroke-linecap="round"
+        stroke-linejoin="round" />
+  <!-- Inner amber accent pill -->
+  <line x1="335" y1="600" x2="465" y2="600"
+        stroke="#C05800"
+        stroke-width="115"
+        stroke-linecap="round" />
+  <!-- Outer amber Q-tail pill -->
+  <line x1="425" y1="845" x2="865" y2="845"
+        stroke="#C05800"
+        stroke-width="115"
+        stroke-linecap="round" />
+</svg>

@@ -1,0 +1,309 @@
+@*
+    Views/Home/BusinessDetails.cshtml
+    Matches the two-column Business Details layout, featuring Bean Crate Cafe's
+    verified identity on the left and a printable Customer Table QR Code generator
+    with a persistent (localStorage-saved) App Base URL on the right.
+*@
+@{
+    ViewData["Title"] = "Business Details";
+    var baseHostUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+    var isLocalHost = Context.Request.Host.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+                      || Context.Request.Host.Host.Equals("127.0.0.1");
+}
+
+<style>
+    .qrder-business-banner {
+        background-color: #ede0c9;
+        color: #2b1d16;
+        border-radius: 16px;
+        padding: 2.25rem 1.5rem;
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .qrder-business-wordmark {
+        font-family: var(--qrder-wordmark-font);
+        font-size: 2.35rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: #2b1d16;
+        line-height: 1.05;
+    }
+
+    @@media print {
+        body * {
+            visibility: hidden !important;
+        }
+
+        #printableTableQrCard,
+        #printableTableQrCard * {
+            visibility: visible !important;
+        }
+
+        #printableTableQrCard {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            max-width: 420px;
+            background: #ffffff !important;
+            color: #000000 !important;
+            border: 1px solid #cccccc !important;
+            padding: 24px !important;
+        }
+
+        .no-print {
+            display: none !important;
+        }
+    }
+</style>
+
+<div class="mb-4 no-print">
+    <div class="qrder-eyebrow">BUSINESS INFORMATION</div>
+    <h1 class="qrder-page-title">Business details</h1>
+    <p class="qrder-page-subtitle mb-0">
+        Bean Crate Cafe&rsquo;s identity, contact information, and customer table QR code.
+    </p>
+</div>
+
+<div class="row g-4">
+    @* Left Card: Bean Crate Cafe Identity & Contact Details *@
+    <div class="col-lg-6 no-print">
+        <div class="qrder-card h-100">
+            <div class="qrder-business-banner">
+                <img src="~/images/qrder-logo.svg"
+                     alt="QRDER Logo"
+                     style="width: 68px; height: 68px; object-fit: contain;"
+                     class="mb-2" />
+                <div class="qrder-business-wordmark">QRDER</div>
+                <div class="small fw-semibold mt-1" style="letter-spacing: 0.18em; color: #6b5244;">
+                    BEAN CRATE CAFE POS
+                </div>
+            </div>
+
+            <h2 class="h4 fw-bold mb-1">Bean Crate Cafe</h2>
+            <p class="text-muted small mb-4">
+                Sen. Lorenzo Sumulong Memorial Circle, Barangay San Jose, Antipolo, Philippines, 1870
+            </p>
+
+            <div class="border-top py-3 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Phone</span>
+                <span class="fw-bold">0927 216 4623</span>
+            </div>
+
+            <div class="border-top pt-3 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Email</span>
+                <span class="fw-bold">beancrateph@gmail.com</span>
+            </div>
+        </div>
+    </div>
+
+    @* Right Card: Social Channels + Printable Customer Table QR Code *@
+    <div class="col-lg-6">
+        <div class="qrder-card mb-4 no-print">
+            <h2 class="h4 fw-bold mb-3">Find Bean Crate</h2>
+
+            <div class="border-bottom py-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Facebook</span>
+                <a href="https://www.facebook.com/beancrateofficial"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="fw-semibold text-decoration-none">
+                    Bean Crate Official &#8599;
+                </a>
+            </div>
+
+            <div class="border-bottom py-2 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Instagram</span>
+                <a href="https://www.instagram.com/beancrateph/"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="fw-semibold text-decoration-none">
+                    @@beancrateph &#8599;
+                </a>
+            </div>
+
+            <div class="py-2 mb-3 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">TikTok</span>
+                <a href="https://www.tiktok.com/@@bean.crate"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="fw-semibold text-decoration-none">
+                    @@bean.crate &#8599;
+                </a>
+            </div>
+
+            <div class="qrder-callout">
+                <div class="fw-bold mb-1">
+                    Made for the Bean Crate counter.
+                </div>
+                <div class="small text-muted">
+                    A thoughtful workspace for taking orders, confirming details, and sharing readable instructions.
+                </div>
+            </div>
+        </div>
+
+        @* Printable Table QR Code Card for Mobile Customer Ordering *@
+        <div class="qrder-card" id="printableTableQrCard">
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-2 no-print">
+                <div>
+                    <div class="qrder-eyebrow">MOBILE TABLE ACCESS</div>
+                    <h2 class="h5 fw-bold mb-0">Customer Ordering QR Code</h2>
+                </div>
+                <button type="button" onclick="window.print()" class="btn btn-sm menu-btn px-3">
+                    Print Table QR
+                </button>
+            </div>
+
+            <p class="text-muted small mb-3 no-print">
+                Print this card for cafe tables so customers can scan it on their phone to start a table session and order.
+            </p>
+
+            @if (isLocalHost)
+            {
+                <div id="localhostWarningBox" class="alert alert-warning small py-2 mb-3 no-print">
+                    <strong>Testing on a phone?</strong> <code>localhost</code> only works on this PC. Paste your public Codespaces URL (set Port visibility to <strong>Public</strong>) or LAN IP below and click <strong>Save URL</strong>.
+                </div>
+            }
+
+            <div class="row g-2 align-items-end mb-3 no-print">
+                <div class="col-sm-4">
+                    <label for="tableLabelInput" class="form-label small fw-semibold mb-1">Table Label</label>
+                    <input type="text"
+                           id="tableLabelInput"
+                           class="form-control form-control-sm"
+                           value="Table 1"
+                           maxlength="25" />
+                </div>
+                <div class="col-sm-8">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label for="qrBaseUrlInput" class="form-label small fw-semibold mb-0">App Base URL</label>
+                        <span id="baseUrlSavedBadge" class="small text-success fw-semibold d-none">Saved &#10003;</span>
+                    </div>
+                    <div class="input-group input-group-sm">
+                        <input type="url"
+                               id="qrBaseUrlInput"
+                               class="form-control"
+                               value="@baseHostUrl"
+                               placeholder="https://your-codespace-url.app.github.dev" />
+                        <button type="button"
+                                id="saveBaseUrlBtn"
+                                class="btn btn-outline-secondary fw-semibold">
+                            Save URL
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="qrder-callout text-center py-4">
+                <div class="fw-bold fs-5 mb-1">Bean Crate Cafe</div>
+                <div class="small text-muted mb-3" id="qrPrintedTableLabel">Table 1 &middot; Scan to Order</div>
+                <div id="qrCodeCanvas" class="d-inline-block p-3 bg-white rounded-3 border"></div>
+                <div class="small text-muted mt-2 text-break" id="qrEncodedLinkPreview"></div>
+                <div class="small text-muted mt-2">
+                    Powered by <span class="qrder-wordmark-inline">QRDER</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+        (() => {
+            const storageKey = "qrder_saved_app_base_url";
+            const qrContainer = document.getElementById("qrCodeCanvas");
+            const tableInput = document.getElementById("tableLabelInput");
+            const baseUrlInput = document.getElementById("qrBaseUrlInput");
+            const saveBaseUrlBtn = document.getElementById("saveBaseUrlBtn");
+            const savedBadge = document.getElementById("baseUrlSavedBadge");
+            const localhostWarningBox = document.getElementById("localhostWarningBox");
+            const printedLabel = document.getElementById("qrPrintedTableLabel");
+            const linkPreview = document.getElementById("qrEncodedLinkPreview");
+
+            // Restore saved App Base URL so it never reverts back to localhost:5070 on reload
+            const savedUrl = localStorage.getItem(storageKey);
+            if (savedUrl && baseUrlInput) {
+                baseUrlInput.value = savedUrl;
+                if (localhostWarningBox && !savedUrl.includes("localhost") && !savedUrl.includes("127.0.0.1")) {
+                    localhostWarningBox.classList.add("d-none");
+                }
+            }
+
+            function persistBaseUrl(showBadge = true) {
+                if (!baseUrlInput) {
+                    return;
+                }
+                const cleaned = baseUrlInput.value.trim().replace(/\/+$/, "");
+                if (!cleaned) {
+                    return;
+                }
+                baseUrlInput.value = cleaned;
+                localStorage.setItem(storageKey, cleaned);
+
+                if (localhostWarningBox) {
+                    const stillLocal = cleaned.includes("localhost") || cleaned.includes("127.0.0.1");
+                    localhostWarningBox.classList.toggle("d-none", !stillLocal);
+                }
+
+                if (showBadge && savedBadge) {
+                    savedBadge.classList.remove("d-none");
+                    clearTimeout(savedBadge._timer);
+                    savedBadge._timer = setTimeout(() => {
+                        savedBadge.classList.add("d-none");
+                    }, 2200);
+                }
+            }
+
+            function buildTableOrderUrl() {
+                const rawBase = (baseUrlInput?.value || window.location.origin).trim().replace(/\/+$/, "");
+                const tableVal = (tableInput?.value || "Table 1").trim() || "Table 1";
+                return `${rawBase}/?table=${encodeURIComponent(tableVal)}`;
+            }
+
+            function renderQrCode() {
+                const tableVal = (tableInput?.value || "").trim() || "Counter / Table";
+                const fullUrl = buildTableOrderUrl();
+
+                if (printedLabel) {
+                    printedLabel.textContent = `${tableVal} · Scan to Order`;
+                }
+                if (linkPreview) {
+                    linkPreview.textContent = fullUrl;
+                }
+                if (!qrContainer) {
+                    return;
+                }
+
+                qrContainer.replaceChildren();
+
+                if (typeof QRCode !== "undefined") {
+                    new QRCode(qrContainer, {
+                        text: fullUrl,
+                        width: 180,
+                        height: 180,
+                        colorDark: "#2b1d16",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                } else {
+                    qrContainer.textContent = fullUrl;
+                }
+            }
+
+            renderQrCode();
+            tableInput?.addEventListener("input", renderQrCode);
+            baseUrlInput?.addEventListener("input", renderQrCode);
+            baseUrlInput?.addEventListener("change", () => {
+                persistBaseUrl(true);
+                renderQrCode();
+            });
+            saveBaseUrlBtn?.addEventListener("click", () => {
+                persistBaseUrl(true);
+                renderQrCode();
+            });
+        })();
+    </script>
+}

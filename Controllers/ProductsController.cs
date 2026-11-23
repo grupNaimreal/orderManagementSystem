@@ -26,34 +26,67 @@ public class ProductsController : Controller
         .Include(p => p.Category)
         .Where(p => p.IsActive);
 
+    private static List<Product> OrderByPhysicalMenu(IEnumerable<Product> products) =>
+        products
+            .OrderBy(p => orderManagementSystem.Data.MenuSeeder.GetCategorySortOrder(p.Category?.Name))
+            .ThenBy(p => orderManagementSystem.Data.MenuSeeder.GetProductSortOrder(p.Name))
+            .ThenBy(p => p.Id)
+            .ToList();
+
     public async Task<IActionResult> Index()
     {
-        await _customerSessionService.GetCurrentCustomerAsync();
+        var isStaff = User.IsInRole("Owner") || User.IsInRole("Employee");
+        var currentCustomer = await _customerSessionService.GetCurrentCustomerAsync();
 
-        return View(await ProductList().OrderBy(p => p.Name).ToListAsync());
+        if (!isStaff && currentCustomer == null)
+        {
+            TempData["SessionNotice"] = "Start a customer session first to browse the Bean Crate Cafe menu.";
+            return RedirectToAction("Index", "Home");
+        }
+
+        ViewBag.CurrentCustomer = currentCustomer;
+        var items = await ProductList().ToListAsync();
+        return View(OrderByPhysicalMenu(items));
     }
 
     [HttpGet]
     public async Task<IActionResult> Search(string? term)
     {
-        await _customerSessionService.GetCurrentCustomerAsync();
+        var isStaff = User.IsInRole("Owner") || User.IsInRole("Employee");
+        var currentCustomer = await _customerSessionService.GetCurrentCustomerAsync();
+
+        if (!isStaff && currentCustomer == null)
+        {
+            return Unauthorized();
+        }
 
         var query = ProductList();
         if (!string.IsNullOrWhiteSpace(term))
-
-             {
+        {
             var value = term.Trim();
             query = query.Where(p => p.Name.Contains(value)
                 || (p.Description != null && p.Description.Contains(value))
                 || p.Category!.Name.Contains(value));
         }
-        return PartialView("_ProductRows", await query.OrderBy(p => p.Name).ToListAsync());
+
+        var items = await query.ToListAsync();
+        return PartialView("_ProductRows", OrderByPhysicalMenu(items));
     }
 
     public async Task<IActionResult> Details(int? id)
     {
         if (id == null) return NotFound();
-        await _customerSessionService.GetCurrentCustomerAsync();
+
+        var isStaff = User.IsInRole("Owner") || User.IsInRole("Employee");
+        var currentCustomer = await _customerSessionService.GetCurrentCustomerAsync();
+
+        if (!isStaff && currentCustomer == null)
+        {
+            TempData["SessionNotice"] = "Start a customer session first to view menu items and order.";
+            return RedirectToAction("Index", "Home");
+        }
+
+        ViewBag.CurrentCustomer = currentCustomer;
         var product = await _context.Products.AsNoTracking()
             .Include(p => p.Category)
             .Include(p => p.Options)

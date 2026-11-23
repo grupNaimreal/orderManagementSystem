@@ -1,57 +1,252 @@
+@*
+    Views/Orders/Index.cshtml
+    PC Order Board for QRDER (Bean Crate Cafe):
+    - Displays live order counts, status/payment filter tabs, instant search,
+      and a detailed desktop table with Asia/Manila timestamps and payment badges.
+    - Retains stack-table mobile fallback attributes for narrow viewports.
+*@
 @model IEnumerable<orderManagementSystem.Models.Order>
 
 @{
-    ViewData["Title"] = "Orders";
+    ViewData["Title"] = "Order Board";
+    var ordersList = Model.ToList();
+    var manilaTz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+
+    var totalCount = ordersList.Count;
+    var activeCount = ordersList.Count(o => o.Status == "Pending" || o.Status == "Preparing");
+    var unpaidCount = ordersList.Count(o => o.Status != "Cancelled" && o.PaymentStatus != "Paid");
+    var completedCount = ordersList.Count(o => o.Status == "Completed");
+
+    string StatusBadgeStyle(string status) => status switch
+    {
+        "Pending" => "background-color: #fff3cd; color: #664d03; border: 1px solid #ffecb5;",
+        "Preparing" => "background-color: #cfe2ff; color: #084298; border: 1px solid #b6d4fe;",
+        "Completed" => "background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;",
+        "Cancelled" => "background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7;",
+        _ => "background-color: var(--qrder-cream-soft); color: var(--qrder-ink);"
+    };
+
+    string PaymentBadgeStyle(string paymentStatus) => paymentStatus switch
+    {
+        "Paid" => "background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;",
+        "Pending" => "background-color: #fff3cd; color: #664d03; border: 1px solid #ffecb5;",
+        "Failed" or "Expired" => "background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7;",
+        _ => "background-color: var(--qrder-cream-soft); color: var(--qrder-muted); border: 1px solid var(--qrder-border);"
+    };
 }
 
-<h1>Orders</h1>
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; BEAN CRATE CAFE</div>
+        <h1 class="qrder-page-title">Order Board</h1>
+        <p class="qrder-page-subtitle mb-0">
+            Track counter and table QR orders, verify payments, and manage kitchen preparation.
+        </p>
+    </div>
 
-<p>
-    <a asp-action="CreateForCustomer" class="btn btn-primary w-100 w-sm-auto">
-        Create Order for Customer
-    </a>
-</p>
+    <div>
+        <a asp-action="CreateForCustomer" class="btn menu-btn px-4 py-2 fw-semibold">
+            + New Order
+        </a>
+    </div>
+</div>
 
-@if (!Model.Any())
+@if (!ordersList.Any())
 {
-    <p class="text-muted">No orders have been placed yet.</p>
+    <div class="qrder-card text-center py-5">
+        <h2 class="h5 fw-bold mb-2">No orders recorded yet</h2>
+        <p class="text-muted small mb-3">
+            Orders placed by customers on mobile or entered at the counter will appear here.
+        </p>
+        <a asp-action="CreateForCustomer" class="btn menu-btn px-4">
+            Create First Order
+        </a>
+    </div>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-striped stack-table">
-            <thead>
-                <tr>
-                    <th>Order #</th>
-                    <th>Customer</th>
-                    <th>Order Date</th>
-                    <th>Total Amount</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var order in Model)
-                {
-                    <tr>
-                        <td data-label="Order #">#@order.Id</td>
-                        <td data-label="Customer">@order.CustomerName</td>
-                        <td data-label="Order Date">@TimeZoneInfo.ConvertTimeFromUtc(
-                            DateTime.SpecifyKind(order.OrderDate, DateTimeKind.Utc),
-                            TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila")
-                        ).ToString("MMM dd, yyyy hh:mm tt")</td>
-                        <td data-label="Total">₱@order.TotalAmount.ToString("N2")</td>
-                        <td data-label="Status">@order.Status</td>
-                        <td data-label="Actions">
-                            <a asp-action="Details"
-                               asp-route-id="@order.Id"
-                               class="btn btn-sm btn-outline-primary">
-                                Details
-                            </a>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+    @* Quick Operational Counters *@
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-3">
+            <div class="qrder-callout">
+                <div class="small text-muted">Total Orders</div>
+                <div class="fs-4 fw-bold mt-1">@totalCount</div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="qrder-callout">
+                <div class="small text-muted">Active (Pending / Preparing)</div>
+                <div class="fs-4 fw-bold mt-1">@activeCount</div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="qrder-callout">
+                <div class="small text-muted">Awaiting Payment</div>
+                <div class="fs-4 fw-bold mt-1">@unpaidCount</div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="qrder-callout">
+                <div class="small text-muted">Completed</div>
+                <div class="fs-4 fw-bold mt-1">@completedCount</div>
+            </div>
+        </div>
     </div>
+
+    @* Filter Pills & Instant Search *@
+    <div class="qrder-card mb-4">
+        <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-3">
+            <div class="d-flex flex-wrap gap-2" id="orderFilterTabs" role="group" aria-label="Filter orders">
+                <button type="button" class="btn btn-sm menu-btn px-3" data-filter="all">All (@totalCount)</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-filter="Pending">Pending</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-filter="Preparing">Preparing</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-filter="unpaid">Unpaid (@unpaidCount)</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-filter="Completed">Completed</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-filter="Cancelled">Cancelled</button>
+            </div>
+
+            <div style="min-width: 240px;">
+                <input type="search"
+                       id="orderSearchInput"
+                       class="form-control form-control-sm"
+                       placeholder="Search Order # or Customer..."
+                       aria-label="Search orders" />
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle stack-table mb-0" id="orderBoardTable">
+                <thead>
+                    <tr>
+                        <th>Order #</th>
+                        <th>Customer</th>
+                        <th>Placed (PHT)</th>
+                        <th>Payment</th>
+                        <th>Order Status</th>
+                        <th class="text-end">Total</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var order in ordersList)
+                    {
+                        var localDate = TimeZoneInfo.ConvertTimeFromUtc(
+                            DateTime.SpecifyKind(order.OrderDate, DateTimeKind.Utc),
+                            manilaTz
+                        );
+                        var isUnpaid = order.Status != "Cancelled" && order.PaymentStatus != "Paid";
+
+                        <tr data-status="@order.Status"
+                            data-unpaid="@(isUnpaid ? "true" : "false")"
+                            data-search="@($"{order.Id} {order.CustomerName} {order.PaymentMethod}".ToLowerInvariant())">
+                            <td data-label="Order #" class="fw-bold">
+                                #@order.Id
+                            </td>
+                            <td data-label="Customer">
+                                <div class="fw-semibold">@order.CustomerName</div>
+                                @if (order.Items != null && order.Items.Any())
+                                {
+                                    <div class="small text-muted">
+                                        @order.Items.Sum(i => i.Quantity) item(s)
+                                    </div>
+                                }
+                            </td>
+                            <td data-label="Placed (PHT)">
+                                <div>@localDate.ToString("MMM dd, yyyy")</div>
+                                <div class="small text-muted">@localDate.ToString("hh:mm tt")</div>
+                            </td>
+                            <td data-label="Payment">
+                                <span class="small fw-semibold me-1">@order.PaymentMethod</span>
+                                <span class="badge rounded-pill" style="@PaymentBadgeStyle(order.PaymentStatus)">
+                                    @order.PaymentStatus
+                                </span>
+                            </td>
+                            <td data-label="Order Status">
+                                <span class="badge rounded-pill" style="@StatusBadgeStyle(order.Status)">
+                                    @order.Status
+                                </span>
+                            </td>
+                            <td data-label="Total" class="text-end fw-bold">
+                                ₱@order.TotalAmount.ToString("N2")
+                            </td>
+                            <td data-label="Actions" class="text-end">
+                                <a asp-action="Details"
+                                   asp-route-id="@order.Id"
+                                   class="btn btn-sm btn-outline-secondary px-3">
+                                    Open &amp; Receipt
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div id="orderEmptyFilterMessage" class="text-center text-muted small py-4 d-none">
+            No orders match the selected filter or search term.
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        (() => {
+            const tabs = document.querySelectorAll("#orderFilterTabs [data-filter]");
+            const searchInput = document.getElementById("orderSearchInput");
+            const rows = document.querySelectorAll("#orderBoardTable tbody tr");
+            const emptyMsg = document.getElementById("orderEmptyFilterMessage");
+
+            if (!tabs.length || !rows.length) {
+                return;
+            }
+
+            let activeFilter = "all";
+
+            function applyFilters() {
+                const query = (searchInput?.value || "").trim().toLowerCase();
+                let visibleCount = 0;
+
+                rows.forEach((row) => {
+                    const status = row.getAttribute("data-status") || "";
+                    const isUnpaid = row.getAttribute("data-unpaid") === "true";
+                    const haystack = row.getAttribute("data-search") || "";
+
+                    const matchesTab =
+                        activeFilter === "all" ||
+                        (activeFilter === "unpaid" ? isUnpaid : status === activeFilter);
+
+                    const matchesQuery = !query || haystack.includes(query);
+
+                    if (matchesTab && matchesQuery) {
+                        row.classList.remove("d-none");
+                        visibleCount++;
+                    } else {
+                        row.classList.add("d-none");
+                    }
+                });
+
+                if (emptyMsg) {
+                    emptyMsg.classList.toggle("d-none", visibleCount > 0);
+                }
+            }
+
+            tabs.forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    activeFilter = btn.getAttribute("data-filter") || "all";
+
+                    tabs.forEach((b) => {
+                        b.classList.remove("menu-btn");
+                        b.classList.add("btn-outline-secondary");
+                    });
+
+                    btn.classList.remove("btn-outline-secondary");
+                    btn.classList.add("menu-btn");
+
+                    applyFilters();
+                });
+            });
+
+            searchInput?.addEventListener("input", applyFilters);
+        })();
+    </script>
 }

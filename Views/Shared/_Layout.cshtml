@@ -1,96 +1,226 @@
+@*
+    Views/Shared/_Layout.cshtml
+    Shared application shell for QRDER (Bean Crate Cafe):
+    - Owner / Employee (PC POS Workspace): Fixed left dark-brown sidebar + fluid cream desktop workspace.
+    - Customer / Unauthenticated (Mobile-Priority, PC-Adaptive): Clean dark-espresso top bar
+      with properly sized QRDER logo, Home link, theme toggle, and high-contrast Login/Account controls.
+*@
+@{
+    var isOwner = User.IsInRole("Owner");
+    var isEmployee = User.IsInRole("Employee");
+    var isStaff = isOwner || isEmployee;
+
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
+
+    bool IsActive(string controller, string? action = null)
+    {
+        var controllerMatch = string.Equals(currentController, controller, StringComparison.OrdinalIgnoreCase);
+        if (!controllerMatch)
+        {
+            return false;
+        }
+
+        return string.IsNullOrEmpty(action)
+            || string.Equals(currentAction, action, StringComparison.OrdinalIgnoreCase);
+    }
+
+    var bodyClass = isStaff ? "qrder-pos-body" : "qrder-mobile-body";
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - orderManagementSystem</title>
+    <title>@ViewData["Title"] - QRDER</title>
     <script type="importmap"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/orderManagementSystem.styles.css" asp-append-version="true" />
 </head>
-<body>
-    <header>
-        <nav class="navbar navbar-expand-lg border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand fw-bold" asp-controller="Home" asp-action="Index">
-                    BEAN CRATE
+<body class="@bodyClass">
+    @if (isStaff)
+    {
+        <div class="qrder-sidebar-backdrop" id="sidebarBackdrop"></div>
+
+        <div class="qrder-pos-shell">
+            <!-- Left Dark-Brown POS Sidebar (Desktop + Slide-over on Narrow Screens) -->
+            <aside class="qrder-sidebar" id="qrderSidebar" aria-label="Workspace Navigation">
+                <div class="qrder-sidebar-top">
+                    <a class="qrder-brand-card" asp-controller="Home" asp-action="Index">
+                        <img src="~/images/qrder-logo.svg" alt="QRDER Logo" class="qrder-brand-icon" />
+                        <span class="qrder-brand-wordmark">QRDER</span>
+                        <span class="qrder-brand-tag">ORDER SYSTEM</span>
+                    </a>
+                    <div class="qrder-pos-caption">POINT OF SALE</div>
+                </div>
+
+                <div class="qrder-sidebar-section-label">WORKSPACE</div>
+
+                <nav class="qrder-sidebar-nav">
+                    <a class="qrder-nav-item @(IsActive("Home", "Index") ? "active" : "")"
+                       asp-controller="Home" asp-action="Index">
+                        <span class="qrder-nav-icon" aria-hidden="true">&#9638;</span>
+                        <span>Overview</span>
+                    </a>
+
+                    <a class="qrder-nav-item @(IsActive("Orders", "CreateForCustomer") ? "active" : "")"
+                       asp-controller="Orders" asp-action="CreateForCustomer">
+                        <span class="qrder-nav-icon" aria-hidden="true">&#43;</span>
+                        <span>New Order</span>
+                    </a>
+
+                    <a class="qrder-nav-item @(IsActive("Orders") && !IsActive("Orders", "CreateForCustomer") ? "active" : "")"
+                       asp-controller="Orders" asp-action="Index">
+                        <span class="qrder-nav-icon" aria-hidden="true">&#9719;</span>
+                        <span>Order Board</span>
+                    </a>
+
+                    <a class="qrder-nav-item @(IsActive("Products") ? "active" : "")"
+                       asp-controller="Products" asp-action="Index">
+                        <span class="qrder-nav-icon" aria-hidden="true">&#9776;</span>
+                        <span>Menu Studio</span>
+                    </a>
+
+                    <a class="qrder-nav-item @(IsActive("Customers") ? "active" : "")"
+                       asp-controller="Customers" asp-action="Index">
+                        <span class="qrder-nav-icon" aria-hidden="true">&#9787;</span>
+                        <span>Customer Sessions</span>
+                    </a>
+
+                    <a class="qrder-nav-item @(IsActive("Reports") ? "active" : "")"
+                       asp-controller="Reports" asp-action="Index">
+                        <span class="qrder-nav-icon" aria-hidden="true">&#9636;</span>
+                        <span>Sales Reports</span>
+                    </a>
+
+                    @if (isOwner)
+                    {
+                        <a class="qrder-nav-item @(IsActive("Employees") ? "active" : "")"
+                           asp-controller="Employees" asp-action="Index">
+                            <span class="qrder-nav-icon" aria-hidden="true">&#9881;</span>
+                            <span>Staff Accounts</span>
+                        </a>
+
+                        <a class="qrder-nav-item @(IsActive("AuditLogs") ? "active" : "")"
+                           asp-controller="AuditLogs" asp-action="Index">
+                            <span class="qrder-nav-icon" aria-hidden="true">&#9745;</span>
+                            <span>Audit Trail</span>
+                        </a>
+                    }
+
+                    <a class="qrder-nav-item @(IsActive("Home", "BusinessDetails") ? "active" : "")"
+                       asp-controller="Home" asp-action="BusinessDetails">
+                        <span class="qrder-nav-icon" aria-hidden="true">&#9733;</span>
+                        <span>Business Details</span>
+                    </a>
+                </nav>
+
+                <div class="qrder-sidebar-footer">
+                    <button type="button"
+                            id="themeToggle"
+                            class="btn btn-sm qrder-sidebar-theme-btn w-100 mb-2">
+                        &#127769; Dark Mode
+                    </button>
+
+                    <div class="qrder-sidebar-account">
+                        <partial name="_LoginPartial" />
+                    </div>
+
+                    <div class="qrder-branch-caption">
+                        <span class="qrder-wordmark-inline">QRDER</span> &middot; Bean Crate Cafe
+                    </div>
+                </div>
+            </aside>
+
+            <div class="qrder-pos-main">
+                @* Compact top bar shown only on narrow screens so the sidebar remains accessible *@
+                <header class="qrder-pos-topbar d-lg-none">
+                    <button type="button"
+                            id="sidebarToggle"
+                            class="btn btn-sm qrder-topbar-btn"
+                            aria-label="Open workspace menu">
+                        &#9776; Menu
+                    </button>
+                    <span class="qrder-wordmark-inline fw-bold">QRDER POS</span>
+                    <span class="badge rounded-pill qrder-role-pill">@(isOwner ? "Owner" : "Staff")</span>
+                </header>
+
+                <main role="main" class="qrder-pos-content">
+                    @RenderBody()
+                </main>
+            </div>
+        </div>
+    }
+    else
+    {
+        @* Mobile-Priority, PC-Adaptive Customer Shell *@
+        <header class="qrder-mobile-header sticky-top">
+            <div class="qrder-mobile-container d-flex align-items-center justify-content-between gap-2">
+                <a class="qrder-mobile-brand" asp-controller="Home" asp-action="Index">
+                    <span class="qrder-mobile-logo-badge">
+                        <img src="~/images/qrder-logo.svg"
+                             alt="QRDER"
+                             width="24"
+                             height="24"
+                             class="qrder-mobile-logo-icon" />
+                    </span>
+                    <span class="d-flex flex-column lh-1">
+                        <span class="qrder-mobile-wordmark">QRDER</span>
+                        <span class="qrder-mobile-sub">Bean Crate Cafe</span>
+                    </span>
                 </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-lg-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link " asp-controller="Home" asp-action="Index">Home</a>
-                        </li>
 
-                        <li class="nav-item">
-                            <a class="nav-link " asp-controller="Products" asp-action="Index">Products</a>
-                        </li>
-
-                        @if (User.IsInRole("Owner") || User.IsInRole("Employee"))
-                        {
-                            <li class="nav-item">
-                                <a class="nav-link " asp-controller="Orders" asp-action="Index">Orders</a>
-                            </li>
-
-                            <li class="nav-item">
-                                <a class="nav-link " asp-controller="Customers" asp-action="Index">Customer Accounts</a>
-                            </li>
-                        }
-
-                        @if (User.IsInRole("Owner"))
-                        {
-                            <li class="nav-item">
-                                <a class="nav-link " asp-controller="Employees" asp-action="Index">Staff Accounts</a>
-                            </li>
-                        }
-
-                        @if (!User.IsInRole("Owner") && !User.IsInRole("Employee"))
-                        {
-                            <li class="nav-item">
-                                <a class="nav-link " asp-controller="Customers" asp-action="Create">Start Customer Session</a>
-                            </li>
-
-                            <li class="nav-item">
-                                <a class="nav-link " asp-controller="Orders" asp-action="Create">Place Order</a>
-                            </li>
-
-                            <li class="nav-item">
-                                <a class="nav-link " asp-controller="Orders" asp-action="MyOrders">My Orders</a>
-                            </li>
-                        }
-
-                        <li class="nav-item">
-                            <a class="nav-link " asp-controller="Home" asp-action="Privacy">Privacy</a>
-                        </li>
-
-                        <li class="nav-item">
-                            <button type="button"
-                                    id="themeToggle"
-                                    class="btn btn-outline-secondary btn-sm ms-lg-3 mt-2 mt-lg-0 nav-theme-toggle">
-                                🌙 Dark Mode
-                            </button>
-                        </li>
-                    </ul>
-                    <partial name="_LoginPartial" />
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button"
+                            id="themeToggle"
+                            class="btn btn-sm qrder-mobile-icon-btn"
+                            title="Toggle color theme">
+                        &#127769;
+                    </button>
+                    <div class="qrder-mobile-login">
+                        <partial name="_LoginPartial" />
+                    </div>
                 </div>
             </div>
-        </nav>
-    </header>
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
-    </div>
+        </header>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - Bean Crate - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+        <div class="qrder-mobile-container qrder-mobile-main">
+            <main role="main" class="pb-4">
+                @RenderBody()
+            </main>
+
+            <footer class="qrder-customer-footer text-center small text-muted py-3 border-top">
+                <div class="mb-2">
+                    <span class="fw-semibold">Bean Crate Cafe</span> &middot; Antipolo City
+                </div>
+                <div class="d-flex justify-content-center flex-wrap gap-3">
+                    <a href="https://www.facebook.com/beancrateofficial"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="text-decoration-none">
+                        Facebook
+                    </a>
+                    <a href="https://www.instagram.com/beancrateph/"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="text-decoration-none">
+                        Instagram
+                    </a>
+                    <a href="https://www.tiktok.com/@@bean.crate"
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="text-decoration-none">
+                        TikTok
+                    </a>
+                </div>
+            </footer>
         </div>
-    </footer>
+    }
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>

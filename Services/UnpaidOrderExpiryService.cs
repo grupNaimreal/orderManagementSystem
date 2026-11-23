@@ -1,3 +1,7 @@
+// Services/UnpaidOrderExpiryService.cs
+// Background worker that cancels unpaid Pending orders after 10 minutes,
+// checking Maya Checkout Sandbox and PayMongo before expiring online orders.
+
 using Microsoft.EntityFrameworkCore;
 using orderManagementSystem.Data;
 using orderManagementSystem.Models;
@@ -17,8 +21,7 @@ public sealed class UnpaidOrderExpiryService : BackgroundService
         _logger = logger;
     }
 
-    protected override async Task ExecuteAsync(
-        CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -26,32 +29,26 @@ public sealed class UnpaidOrderExpiryService : BackgroundService
             {
                 await ExpireDueOrdersAsync(stoppingToken);
             }
-            catch (OperationCanceledException)
-                when (stoppingToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 break;
             }
             catch (Exception exception)
             {
-                _logger.LogError(
-                    exception,
-                    "The unpaid-order expiry check failed.");
+                _logger.LogError(exception, "The unpaid-order expiry check failed.");
             }
 
             await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
         }
     }
 
-    private async Task ExpireDueOrdersAsync(
-        CancellationToken cancellationToken)
+    private async Task ExpireDueOrdersAsync(CancellationToken cancellationToken)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
 
-        var context = scope.ServiceProvider
-            .GetRequiredService<ApplicationDbContext>();
-
-        var payMongo = scope.ServiceProvider
-            .GetRequiredService<PayMongoService>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var payMongo = scope.ServiceProvider.GetRequiredService<PayMongoService>();
+        var mayaCheckout = scope.ServiceProvider.GetRequiredService<MayaCheckoutService>();
 
         var cutoff = DateTime.UtcNow.AddMinutes(-10);
 
@@ -64,47 +61,81 @@ public sealed class UnpaidOrderExpiryService : BackgroundService
 
         foreach (var order in orders)
         {
-            if (order.PaymentMethod == OrderPaymentMethods.Cash
-                || (order.PaymentMethod == OrderPaymentMethods.PayMongo
-                    && string.IsNullOrWhiteSpace(
-                        order.PayMongoCheckoutSessionId)))
+            if (order.PaymentMethod == OrderPaymentMethods.Cash)
             {
                 MarkExpired(order);
                 continue;
             }
 
-            if (order.PaymentMethod != OrderPaymentMethods.PayMongo)
-                continue;
-
-            try
+            if (order.PaymentMethod == "Maya")
             {
-                var session = await payMongo
-                    .ExpireAndRetrieveCheckoutSessionAsync(
-                        order.PayMongoCheckoutSessionId!,
-                        cancellationToken);
-
-                if (!string.IsNullOrWhiteSpace(session.PaidPaymentId))
-                {
-                    order.PayMongoPaymentId = session.PaidPaymentId;
-                    order.PaymentStatus = OrderPaymentStatuses.Paid;
-                    order.PaymentPaidAtUtc =
-                        session.PaidAtUtc ?? DateTime.UtcNow;
-                }
-                else if (session.Status.Equals(
-                    "expired", StringComparison.OrdinalIgnoreCase))
+                if (string.IsNullOrWhiteSpace(order.PayMongoCheckoutSessionId))
                 {
                     MarkExpired(order);
+                    continue;
                 }
-                // If payment is processing, leave it pending.
-                // The next check or the paid webhook will resolve it.
+
+                try
+                {
+                    var status = await mayaCheckout.GetCheckoutStatusAsync(
+                        order.PayMongoCheckoutSessionId,
+                        cancellationToken);
+
+                    if (status.IsPaid)
+                    {
+                        order.PaymentStatus = OrderPaymentStatuses.Paid;
+                        order.PaymentPaidAtUtc = DateTime.UtcNow;
+                        order.PayMongoPaymentId = status.PaymentReference ?? order.PayMongoCheckoutSessionId;
+                    }
+                    else
+                    {
+                        MarkExpired(order);
+                    }
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    _logger.LogWarning(
+                        exception,
+                        "Could not verify Maya Checkout status for order {OrderId}; expiring locally.",
+                        order.Id);
+                    MarkExpired(order);
+                }
+
+                continue;
             }
-            catch (Exception exception)
-                when (exception is not OperationCanceledException)
+
+            if (order.PaymentMethod == OrderPaymentMethods.PayMongo)
             {
-                _logger.LogWarning(
-                    exception,
-                    "Could not expire or verify PayMongo session for order {OrderId}.",
-                    order.Id);
+                if (string.IsNullOrWhiteSpace(order.PayMongoCheckoutSessionId))
+                {
+                    MarkExpired(order);
+                    continue;
+                }
+
+                try
+                {
+                    var session = await payMongo.ExpireAndRetrieveCheckoutSessionAsync(
+                        order.PayMongoCheckoutSessionId,
+                        cancellationToken);
+
+                    if (!string.IsNullOrWhiteSpace(session.PaidPaymentId))
+                    {
+                        order.PayMongoPaymentId = session.PaidPaymentId;
+                        order.PaymentStatus = OrderPaymentStatuses.Paid;
+                        order.PaymentPaidAtUtc = session.PaidAtUtc ?? DateTime.UtcNow;
+                    }
+                    else if (session.Status.Equals("expired", StringComparison.OrdinalIgnoreCase))
+                    {
+                        MarkExpired(order);
+                    }
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    _logger.LogWarning(
+                        exception,
+                        "Could not expire or verify PayMongo session for order {OrderId}.",
+                        order.Id);
+                }
             }
         }
 

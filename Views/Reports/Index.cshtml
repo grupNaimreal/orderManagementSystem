@@ -1,0 +1,205 @@
+@*
+    Views/Reports/Index.cshtml
+    PC Sales Reports & VAT Breakdown for QRDER (Bean Crate Cafe):
+    - Preset date filters (Today, Last 7 Days, This Month) + custom date picker
+    - Gross Sales, Net Sales, 12% VAT Collected, Cash vs. Cashless breakdown
+    - Top-selling items table, detailed order ledger, and CSV export
+*@
+@model orderManagementSystem.Controllers.SalesReportViewModel
+
+@{
+    ViewData["Title"] = "Sales Reports";
+    var manilaTz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+}
+
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; BEAN CRATE CAFE</div>
+        <h1 class="qrder-page-title">Sales Reports</h1>
+        <p class="qrder-page-subtitle mb-0">
+            Showing financial and order summary for
+            <strong>@Model.StartDate.ToString("MMM dd, yyyy")</strong>
+            @if (Model.StartDate != Model.EndDate)
+            {
+                <span>to <strong>@Model.EndDate.ToString("MMM dd, yyyy")</strong></span>
+            }
+            (PHT).
+        </p>
+    </div>
+
+    <div>
+        <a asp-action="ExportCsv"
+           asp-route-range="@Model.Range"
+           asp-route-startDate="@Model.StartDate.ToString("yyyy-MM-dd")"
+           asp-route-endDate="@Model.EndDate.ToString("yyyy-MM-dd")"
+           class="btn menu-btn px-4 py-2 fw-semibold">
+            Export CSV Report
+        </a>
+    </div>
+</div>
+
+@* Date Range Filter Bar *@
+<div class="qrder-card mb-4">
+    <div class="d-flex flex-column flex-xl-row align-items-xl-end justify-content-between gap-3">
+        <div class="d-flex flex-wrap gap-2">
+            <a asp-action="Index"
+               asp-route-range="today"
+               class="btn btn-sm @(Model.Range == "today" ? "menu-btn" : "btn-outline-secondary") px-3">
+                Today
+            </a>
+            <a asp-action="Index"
+               asp-route-range="week"
+               class="btn btn-sm @(Model.Range == "week" ? "menu-btn" : "btn-outline-secondary") px-3">
+                Last 7 Days
+            </a>
+            <a asp-action="Index"
+               asp-route-range="month"
+               class="btn btn-sm @(Model.Range == "month" ? "menu-btn" : "btn-outline-secondary") px-3">
+                This Month
+            </a>
+        </div>
+
+        <form asp-action="Index" method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="range" value="custom" />
+            <div class="col-auto">
+                <label for="startDate" class="form-label small text-muted mb-1">From</label>
+                <input type="date"
+                       id="startDate"
+                       name="startDate"
+                       value="@Model.StartDate.ToString("yyyy-MM-dd")"
+                       class="form-control form-control-sm" />
+            </div>
+            <div class="col-auto">
+                <label for="endDate" class="form-label small text-muted mb-1">To</label>
+                <input type="date"
+                       id="endDate"
+                       name="endDate"
+                       value="@Model.EndDate.ToString("yyyy-MM-dd")"
+                       class="form-control form-control-sm" />
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-outline-secondary px-3">
+                    Apply Dates
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@* KPI Summary Cards *@
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="qrder-card h-100">
+            <div class="small text-muted">Gross Sales (VAT-Inc.)</div>
+            <div class="fs-3 fw-bold mt-1">₱@Model.GrossSales.ToString("N2")</div>
+            <div class="small text-muted mt-1">@Model.TotalOrders active/completed order(s)</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="qrder-card h-100">
+            <div class="small text-muted">Net Sales (Excl. VAT)</div>
+            <div class="fs-3 fw-bold mt-1">₱@Model.NetSales.ToString("N2")</div>
+            <div class="small text-muted mt-1">12% VAT: ₱@Model.VatAmount.ToString("N2")</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="qrder-card h-100">
+            <div class="small text-muted">Cash vs. Online</div>
+            <div class="fw-bold mt-2">Cash: ₱@Model.CashSales.ToString("N2")</div>
+            <div class="small text-muted">Online (Maya): ₱@Model.CashlessSales.ToString("N2")</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="qrder-card h-100">
+            <div class="small text-muted">Order Fulfillment</div>
+            <div class="fw-bold mt-2">Completed: @Model.CompletedOrders</div>
+            <div class="small text-muted">Cancelled: @Model.CancelledOrders</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    @* Left: Top-Selling Items *@
+    <div class="col-lg-5">
+        <div class="qrder-card h-100">
+            <h2 class="h5 fw-bold mb-3">Top-Selling Items</h2>
+            @if (!Model.TopProducts.Any())
+            {
+                <p class="text-muted small mb-0">No non-cancelled items sold in this period.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th class="text-center">Qty</th>
+                                <th class="text-end">Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.TopProducts)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@item.ProductName</td>
+                                    <td class="text-center">@item.QuantitySold</td>
+                                    <td class="text-end fw-bold">₱@item.Revenue.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* Right: Transaction Ledger *@
+    <div class="col-lg-7">
+        <div class="qrder-card h-100">
+            <h2 class="h5 fw-bold mb-3">Order Ledger (@Model.Orders.Count)</h2>
+            @if (!Model.Orders.Any())
+            {
+                <p class="text-muted small mb-0">No orders recorded during this date range.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle stack-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Order #</th>
+                                <th>Time (PHT)</th>
+                                <th>Customer</th>
+                                <th>Method</th>
+                                <th>Status</th>
+                                <th class="text-end">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var o in Model.Orders)
+                            {
+                                var localDt = TimeZoneInfo.ConvertTimeFromUtc(
+                                    DateTime.SpecifyKind(o.OrderDate, DateTimeKind.Utc),
+                                    manilaTz
+                                );
+                                <tr>
+                                    <td data-label="Order #">
+                                        <a asp-controller="Orders" asp-action="Details" asp-route-id="@o.Id" class="fw-bold text-decoration-none">
+                                            #@o.Id
+                                        </a>
+                                    </td>
+                                    <td data-label="Time (PHT)" class="small">@localDt.ToString("MMM dd, hh:mm tt")</td>
+                                    <td data-label="Customer">@o.CustomerName</td>
+                                    <td data-label="Method" class="small">@o.PaymentMethod (@o.PaymentStatus)</td>
+                                    <td data-label="Status" class="small">@o.Status</td>
+                                    <td data-label="Total" class="text-end fw-bold">₱@o.TotalAmount.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>

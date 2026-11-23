@@ -1,93 +1,450 @@
+@*
+    Views/Products/Details.cshtml
+    Item Customization & Add-to-Order screen for QRDER (Bean Crate Cafe):
+    - Customers see a clean 1:1 product card, a compact Variant dropdown,
+      collapsible Add-ons, quantity controls, and an "Add to Order" button
+      that shows an "Added to Order" confirmation popup and returns to the Menu.
+    - Owners retain full Variant/Add-on CRUD and availability controls below.
+*@
 @model orderManagementSystem.Models.Product
 @{
-    ViewData["Title"] = "Product Details";
+    var isOwner = User.IsInRole("Owner");
+    var isStaff = isOwner || User.IsInRole("Employee");
+    ViewData["Title"] = Model.Name;
+
+    var variants = Model.Options
+        .Where(o => o.IsAvailable && o.OptionType == "Variant")
+        .OrderBy(o => o.PriceAdjustment)
+        .ThenBy(o => o.Name)
+        .ToList();
+
+    var addOns = Model.Options
+        .Where(o => o.IsAvailable && o.OptionType == "AddOn")
+        .OrderBy(o => o.PriceAdjustment)
+        .ThenBy(o => o.Name)
+        .ToList();
+
+    var categoryName = string.IsNullOrWhiteSpace(Model.Category?.Name) ? "Menu Item" : Model.Category!.Name.Trim();
+    var defaultPngUrl = $"/images/products/{orderManagementSystem.Data.MenuSeeder.ToProductSlug(Model.Name)}.png";
+    var resolvedImageUrl = string.IsNullOrWhiteSpace(Model.ImageUrl)
+        ? defaultPngUrl
+        : (Model.ImageUrl.StartsWith("/images/products/", StringComparison.OrdinalIgnoreCase)
+           && Model.ImageUrl.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+            ? Model.ImageUrl[..^4] + ".png"
+            : Model.ImageUrl);
+
+    var (bgGradient, accentColor) = categoryName.ToLowerInvariant() switch
+    {
+        "matcha foam series" => ("linear-gradient(135deg, #e5efe0 0%, #c9dec0 100%)", "#2D5224"),
+        "ube series" => ("linear-gradient(135deg, #ece3f5 0%, #d5c2ea 100%)", "#4B2673"),
+        "pistachio series" => ("linear-gradient(135deg, #e9efe1 0%, #d1dec1 100%)", "#3F5723"),
+        "buldak series" => ("linear-gradient(135deg, #fbe0dc 0%, #f2b8af 100%)", "#8F1D14"),
+        "parfait series" or "specialty drinks" => ("linear-gradient(135deg, #fae3e8 0%, #f1c5d0 100%)", "#7A223B"),
+        "juices & lemonades" or "snacks" => ("linear-gradient(135deg, #fcf6d8 0%, #f4e69c 100%)", "#6E5800"),
+        "lemon soda" => ("linear-gradient(135deg, #e7f4f8 0%, #cde7f0 100%)", "#1D5B72"),
+        _ => ("linear-gradient(135deg, #f3e5d8 0%, #e4ccb6 100%)", "#4A1C05")
+    };
 }
 
-<h1>@Model.Name</h1>
-<dl class="row">
-    <dt class="col-sm-3">Category</dt>
-    <dd class="col-sm-9">@Model.Category?.Name</dd>
-    <dt class="col-sm-3">Description</dt>
-    <dd class="col-sm-9">@Model.Description</dd>
-    <dt class="col-sm-3">Price</dt>
-    <dd class="col-sm-9">@Model.Price.ToString("N2")</dd>
-    <dt class="col-sm-3">Availability</dt>
-    <dd class="col-sm-9">@(Model.IsAvailable ? "Available" : "Unavailable")</dd>
-    @if (!string.IsNullOrWhiteSpace(Model.ImageUrl))
-    {
-        <dt class="col-sm-3">Image</dt>
-        <dd class="col-sm-9">
-            <img src="@Model.ImageUrl" alt="@Model.Name" class="img-fluid rounded" style="max-width:240px;max-height:180px" />
-        </dd>
+<style>
+    .detail-square-img-wrap {
+        position: relative;
+        width: 100%;
+        max-width: 280px;
+        aspect-ratio: 1 / 1;
+        border-radius: 16px;
+        overflow: hidden;
+        background-color: var(--qrder-cream-soft);
+        border: 1px solid var(--qrder-border);
+        margin: 0 auto;
     }
-</dl>
-<h2>Variants and Add-ons</h2>
-<div class="table-responsive">
-    <table class="table table-striped stack-table">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Price Adjustment</th>
-                <th>Available</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-        @foreach (var option in Model.Options.OrderBy(o => o.OptionType).ThenBy(o => o.Name))
-        {
-            <tr>
-                <td data-label="Name">@option.Name</td>
-                <td data-label="Type">@option.OptionType</td>
-                <td data-label="Price Adjustment">@option.PriceAdjustment.ToString("N2")</td>
-                <td data-label="Available">@(option.IsAvailable ? "Yes" : "No")</td>
-                <td data-label="Actions">
-                    @if (User.IsInRole("Owner"))
-                    {
-                        <a asp-action="EditOption" asp-route-id="@option.Id">Edit</a>
-                        <form asp-action="DeleteOption" asp-route-id="@option.Id" method="post" class="d-inline">
-                            <button class="btn btn-link p-0" type="submit">Delete</button>
-                        </form>
-                    }
-                </td>
-            </tr>
-        }
-        </tbody>
-    </table>
-</div>
-@if (User.IsInRole("Owner"))
-{
-    <h3>Add Variant / Add-on</h3>
-    @if (TempData["OptionError"] != null)
-    {
-        <p class="text-danger">@TempData["OptionError"]</p>
-    }
-    <form asp-action="AddOption" method="post">
-        <input type="hidden" name="ProductId" value="@Model.Id" />
-        <div class="mb-2"><label for="optionName">Name</label><input id="optionName" name="Name" class="form-control" required maxlength="80" /></div>
-        <div class="mb-2"><label for="optionType">Type</label><select id="optionType" name="OptionType" class="form-select"><option>Variant</option><option>AddOn</option></select></div>
-        <div class="mb-2"><label for="priceAdjustment">Price adjustment</label><input id="priceAdjustment" name="PriceAdjustment" type="number" step="0.01" value="0" class="form-control" /></div>
-        <div class="form-check mb-3"><input id="optionAvailable" name="IsAvailable" type="checkbox" value="true" checked class="form-check-input" /><input name="IsAvailable" type="hidden" value="false" /><label for="optionAvailable">Available</label></div>
-        <button class="btn btn-primary w-100 w-sm-auto" type="submit">Add Option</button>
-    </form>
-}
-@if (User.IsInRole("Owner"))
-{
-    <form asp-action="SetAvailability" method="post" class="mt-3">
-        <input type="hidden" name="id" value="@Model.Id" />
-        <input type="hidden" name="isAvailable" value="@(!Model.IsAvailable)" />
-        <button class="btn btn-outline-primary w-100 w-sm-auto" type="submit">
-            Mark @(Model.IsAvailable ? "Unavailable" : "Available")
-        </button>
-    </form>
 
-    <a asp-action="Edit"
-       asp-route-id="@Model.Id"
-       class="btn btn-secondary mt-3 w-100 w-sm-auto">
-        Edit Product
+    .detail-square-img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        object-fit: cover;
+        object-position: center;
+        display: block;
+    }
+
+    .qrder-added-popup-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(24, 15, 11, 0.55);
+        z-index: 1060;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    .qrder-added-popup-card {
+        background: var(--qrder-surface);
+        color: var(--qrder-ink);
+        border: 1px solid var(--qrder-border);
+        border-radius: 18px;
+        max-width: 360px;
+        width: 100%;
+        padding: 1.75rem 1.5rem;
+        text-align: center;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+    }
+
+    .qrder-added-check {
+        width: 52px;
+        height: 52px;
+        border-radius: 999px;
+        background-color: #d1e7dd;
+        color: #0f5132;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.85rem;
+    }
+</style>
+
+<div class="mb-3">
+    <a asp-action="Index" class="btn btn-sm btn-outline-secondary px-3">
+        &larr; Back to Menu
     </a>
-}
+</div>
 
-<a asp-action="Index" class="btn btn-secondary mt-3 w-100 w-sm-auto">
-    Back to Products
-</a>
+<div class="mx-auto" style="max-width: 720px;">
+    <div class="qrder-card mb-4">
+        <div class="row g-4 align-items-center">
+            <div class="col-md-5">
+                <div class="detail-square-img-wrap">
+                    <img src="@resolvedImageUrl"
+                         alt="@Model.Name"
+                         class="detail-square-img"
+                         onerror="this.style.display='none'; this.nextElementSibling.classList.remove('d-none');" />
+                    <div class="d-none w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3 text-center"
+                         style="background: @bgGradient; color: @accentColor;">
+                        <span class="badge rounded-pill mb-2" style="background: rgba(255,255,255,0.75); color: @accentColor;">
+                            @categoryName
+                        </span>
+                        <span class="fw-bold fs-6">@Model.Name</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-7">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="badge rounded-pill"
+                          style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1px solid var(--qrder-border);">
+                        @categoryName
+                    </span>
+                    @if (Model.IsAvailable)
+                    {
+                        <span class="badge rounded-pill"
+                              style="background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;">
+                            Available
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge rounded-pill"
+                              style="background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7;">
+                            Unavailable
+                        </span>
+                    }
+                </div>
+
+                <h1 class="h3 fw-bold mb-1">@Model.Name</h1>
+
+                @if (!string.IsNullOrWhiteSpace(Model.Description))
+                {
+                    <p class="text-muted small mb-3">@Model.Description</p>
+                }
+
+                <div class="fs-4 fw-bold mb-3" id="liveItemTotal" data-base-price="@Model.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                    ₱@Model.Price.ToString("N2")
+                </div>
+
+                @if (!isStaff)
+                {
+                    @if (variants.Any())
+                    {
+                        <div class="mb-3">
+                            <label for="customerVariantSelect" class="form-label small fw-semibold mb-1">
+                                Choose Size / Variant
+                            </label>
+                            <select id="customerVariantSelect" class="form-select">
+                                <option value="" data-adj="0">Standard (+₱0.00)</option>
+                                @foreach (var variant in variants)
+                                {
+                                    var sign = variant.PriceAdjustment >= 0 ? "+" : "";
+                                    <option value="@variant.Id"
+                                            data-adj="@variant.PriceAdjustment.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                                        @variant.Name (@($"{sign}₱{variant.PriceAdjustment:N2}"))
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                    }
+
+                    @if (addOns.Any())
+                    {
+                        <details class="mb-3 border rounded-3 p-2" style="border-color: var(--qrder-border) !important;">
+                            <summary class="small fw-semibold px-1" style="cursor: pointer;">
+                                Optional Add-ons (@addOns.Count available)
+                            </summary>
+                            <div class="pt-2 px-1 d-flex flex-column gap-2">
+                                @foreach (var addOn in addOns)
+                                {
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input customer-addon-check"
+                                               type="checkbox"
+                                               value="@addOn.Id"
+                                               data-adj="@addOn.PriceAdjustment.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                               id="custAddon_@addOn.Id" />
+                                        <label class="form-check-label small" for="custAddon_@addOn.Id">
+                                            @addOn.Name (+₱@addOn.PriceAdjustment.ToString("N2"))
+                                        </label>
+                                    </div>
+                                }
+                            </div>
+                        </details>
+                    }
+
+                    <div class="mb-3">
+                        <label for="customerQtyInput" class="form-label small fw-semibold mb-1">Quantity</label>
+                        <div class="input-group" style="max-width: 160px;">
+                            <button type="button" class="btn btn-outline-secondary" id="qtyMinusBtn" aria-label="Decrease quantity">&minus;</button>
+                            <input type="number"
+                                   id="customerQtyInput"
+                                   class="form-control text-center fw-bold"
+                                   value="1"
+                                   min="1"
+                                   max="99" />
+                            <button type="button" class="btn btn-outline-secondary" id="qtyPlusBtn" aria-label="Increase quantity">&#43;</button>
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="button"
+                                id="addToOrderBtn"
+                                class="btn menu-btn py-2 fw-semibold"
+                                disabled="@(!Model.IsAvailable)">
+                            @(Model.IsAvailable ? "Add to Order" : "Currently Unavailable")
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (isOwner)
+    {
+        <div class="qrder-card mb-4">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <h2 class="h5 fw-bold mb-0">Variants &amp; Add-ons Management</h2>
+                <div class="d-flex flex-wrap gap-2">
+                    <form asp-action="SetAvailability" method="post" class="d-inline">
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <input type="hidden" name="isAvailable" value="@(!Model.IsAvailable)" />
+                        <button class="btn btn-sm btn-outline-secondary" type="submit">
+                            Mark @(Model.IsAvailable ? "Unavailable" : "Available")
+                        </button>
+                    </form>
+                    <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-sm btn-outline-secondary">
+                        Edit Product
+                    </a>
+                </div>
+            </div>
+
+            <div class="table-responsive mb-4">
+                <table class="table table-sm align-middle stack-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Price Adjustment</th>
+                            <th>Available</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var option in Model.Options.OrderBy(o => o.OptionType).ThenBy(o => o.Name))
+                    {
+                        <tr>
+                            <td data-label="Name" class="fw-semibold">@option.Name</td>
+                            <td data-label="Type">@option.OptionType</td>
+                            <td data-label="Price Adjustment">₱@option.PriceAdjustment.ToString("N2")</td>
+                            <td data-label="Available">@(option.IsAvailable ? "Yes" : "No")</td>
+                            <td data-label="Actions" class="text-end">
+                                <a asp-action="EditOption" asp-route-id="@option.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                <form asp-action="DeleteOption" asp-route-id="@option.Id" method="post" class="d-inline">
+                                    <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 class="h6 fw-bold mb-2">Add Variant / Add-on</h3>
+            @if (TempData["OptionError"] != null)
+            {
+                <p class="text-danger small">@TempData["OptionError"]</p>
+            }
+            <form asp-action="AddOption" method="post" class="row g-2 align-items-end">
+                <input type="hidden" name="ProductId" value="@Model.Id" />
+                <div class="col-md-4">
+                    <label for="optionName" class="form-label small">Name</label>
+                    <input id="optionName" name="Name" class="form-control form-control-sm" required maxlength="80" />
+                </div>
+                <div class="col-md-3">
+                    <label for="optionType" class="form-label small">Type</label>
+                    <select id="optionType" name="OptionType" class="form-select form-select-sm">
+                        <option>Variant</option>
+                        <option>AddOn</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="priceAdjustment" class="form-label small">Price Adjustment</label>
+                    <input id="priceAdjustment" name="PriceAdjustment" type="number" step="0.01" value="0" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-2">
+                    <div class="form-check mb-2">
+                        <input id="optionAvailable" name="IsAvailable" type="checkbox" value="true" checked class="form-check-input" />
+                        <input name="IsAvailable" type="hidden" value="false" />
+                        <label for="optionAvailable" class="form-check-label small">Available</label>
+                    </div>
+                    <button class="btn btn-sm menu-btn w-100" type="submit">Add Option</button>
+                </div>
+            </form>
+        </div>
+    }
+</div>
+
+@* Added-to-Order Confirmation Popup *@
+<div id="addedToOrderPopup" class="qrder-added-popup-backdrop d-none" role="dialog" aria-modal="true" aria-labelledby="addedPopupTitle">
+    <div class="qrder-added-popup-card">
+        <div class="qrder-added-check" aria-hidden="true">&#10003;</div>
+        <h2 class="h5 fw-bold mb-1" id="addedPopupTitle">Added to Order!</h2>
+        <p class="text-muted small mb-3" id="addedPopupSummary">
+            @Model.Name has been added to your order. Returning to menu...
+        </p>
+        <div class="d-grid gap-2">
+            <a asp-action="Index" class="btn menu-btn fw-semibold">Back to Menu</a>
+            <a asp-controller="Orders" asp-action="Create" class="btn btn-outline-secondary btn-sm">Proceed to Checkout</a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (() => {
+            const totalEl = document.getElementById('liveItemTotal');
+            const variantSelect = document.getElementById('customerVariantSelect');
+            const addOnChecks = document.querySelectorAll('.customer-addon-check');
+            const qtyInput = document.getElementById('customerQtyInput');
+            const qtyMinusBtn = document.getElementById('qtyMinusBtn');
+            const qtyPlusBtn = document.getElementById('qtyPlusBtn');
+            const addBtn = document.getElementById('addToOrderBtn');
+            const popup = document.getElementById('addedToOrderPopup');
+            const popupSummary = document.getElementById('addedPopupSummary');
+
+            if (!totalEl || !addBtn) {
+                return;
+            }
+
+            const basePrice = Number(totalEl.dataset.basePrice || 0);
+            const menuUrl = '@Url.Action("Index", "Products")';
+            const cartStorageKey = 'qrder_customer_cart';
+
+            function getSelectedQuantity() {
+                const raw = Number(qtyInput?.value || 1);
+                return Math.max(1, Math.min(99, isNaN(raw) ? 1 : Math.floor(raw)));
+            }
+
+            function recalcItemPrice() {
+                let unit = basePrice;
+
+                if (variantSelect && variantSelect.selectedOptions.length > 0) {
+                    unit += Number(variantSelect.selectedOptions[0].dataset.adj || 0);
+                }
+
+                addOnChecks.forEach(cb => {
+                    if (cb.checked) {
+                        unit += Number(cb.dataset.adj || 0);
+                    }
+                });
+
+                const qty = getSelectedQuantity();
+                totalEl.textContent = '₱' + (unit * qty).toFixed(2);
+            }
+
+            qtyMinusBtn?.addEventListener('click', () => {
+                if (!qtyInput) return;
+                qtyInput.value = String(Math.max(1, getSelectedQuantity() - 1));
+                recalcItemPrice();
+            });
+
+            qtyPlusBtn?.addEventListener('click', () => {
+                if (!qtyInput) return;
+                qtyInput.value = String(Math.min(99, getSelectedQuantity() + 1));
+                recalcItemPrice();
+            });
+
+            qtyInput?.addEventListener('input', recalcItemPrice);
+            variantSelect?.addEventListener('change', recalcItemPrice);
+            addOnChecks.forEach(cb => cb.addEventListener('change', recalcItemPrice));
+            recalcItemPrice();
+
+            addBtn.addEventListener('click', () => {
+                const qty = getSelectedQuantity();
+                const variantId = variantSelect && variantSelect.value ? Number(variantSelect.value) : null;
+                const addOnIds = Array.from(addOnChecks)
+                    .filter(cb => cb.checked)
+                    .map(cb => Number(cb.value))
+                    .sort((a, b) => a - b);
+
+                let cart = [];
+                try {
+                    const existing = sessionStorage.getItem(cartStorageKey);
+                    cart = existing ? JSON.parse(existing) : [];
+                    if (!Array.isArray(cart)) cart = [];
+                } catch {
+                    cart = [];
+                }
+
+                const matchIndex = cart.findIndex(item =>
+                    Number(item.ProductId) === @Model.Id &&
+                    (item.VariantOptionId ?? null) === variantId &&
+                    JSON.stringify((item.AddOnOptionIds || []).slice().sort((a, b) => a - b)) === JSON.stringify(addOnIds)
+                );
+
+                if (matchIndex >= 0) {
+                    cart[matchIndex].Quantity = Math.min(99, Number(cart[matchIndex].Quantity || 1) + qty);
+                } else {
+                    cart.push({
+                        ProductId: @Model.Id,
+                        Quantity: qty,
+                        VariantOptionId: variantId,
+                        AddOnOptionIds: addOnIds
+                    });
+                }
+
+                sessionStorage.setItem(cartStorageKey, JSON.stringify(cart));
+
+                if (popupSummary) {
+                    popupSummary.textContent = `${qty} × @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Name)) added to your order. Returning to menu...`;
+                }
+
+                popup?.classList.remove('d-none');
+
+                setTimeout(() => {
+                    window.location.href = menuUrl;
+                }, 950);
+            });
+        })();
+    </script>
+}

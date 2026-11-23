@@ -1,146 +1,222 @@
 @{
-    ViewData["Title"] = "Home";
+    ViewData["Title"] = "Overview";
+    var isOwner = User.IsInRole("Owner");
+    var isStaff = isOwner || User.IsInRole("Employee");
+
+    string todayOrders = ViewBag.TodayOrdersCount?.ToString() ?? "—";
+    string activeOrders = ViewBag.ActiveOrdersCount?.ToString() ?? "—";
+    string pendingPayments = ViewBag.PendingPaymentsCount?.ToString() ?? "—";
+    string todaySales = ViewBag.TodaySalesFormatted as string ?? "—";
 }
 
-<style>
-    .bean-hero {
-        background: #3b2921;
-        color: #fffaf2;
-        border-radius: 18px;
-        padding: 76px 48px;
-    }
-
-    .bean-hero h1 {
-        font-size: clamp(2.5rem, 6vw, 4.5rem);
-        font-weight: 750;
-        letter-spacing: -2px;
-    }
-
-    .bean-hero p {
-        color: #e7d8c8;
-        max-width: 520px;
-        font-size: 1.1rem;
-    }
-
-    .bean-btn {
-        background: #d5a66b;
-        color: #2e211b;
-        border: none;
-        font-weight: 600;
-    }
-
-    .bean-btn:hover {
-        background: #e5bc8b;
-        color: #2e211b;
-    }
-
-    .bean-category {
-        background: #f6f0e8;
-        border: 1px solid #eadfD2;
-        border-radius: 14px;
-        padding: 26px;
-        height: 100%;
-    }
-
-    .bean-category h3 {
-        color: #3b2921;
-        font-weight: 700;
-    }
-
-    .bean-category p {
-        color: #75675d;
-    }
-
-    .bean-section-title {
-        color: #3b2921;
-        font-weight: 750;
-    }
-
-    @@media (max-width: 575.98px) {
-        .bean-hero {
-            padding: 28px 20px;
-            border-radius: 14px;
-        }
-
-        .bean-hero h1 {
-            letter-spacing: -1px;
-        }
-
-        .bean-btn {
-            width: 100%;
-        }
-    }
-</style>
-
-<div class="py-3 py-md-4">
-    <section class="bean-hero mb-5">
-        <div class="row align-items-center">
-            <div class="col-lg-8">
-                <p class="text-uppercase fw-semibold mb-3">
-                    Welcome to Bean Crate
-                </p>
-                <h1>Your coffee.<br />Your comfort.</h1>
-                <p class="mt-3 mb-4">
-                    Good drinks, satisfying meals, and a cozy place
-                    to enjoy the little things.
-                </p>
-                <a asp-controller="Products"
-                   asp-action="Index"
-                   class="btn bean-btn btn-lg px-4">
-                    Browse Our Menu
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <section class="mb-5">
-        <div class="text-center mb-4">
-            <h2 class="bean-section-title">Something for everyone</h2>
-            <p class="text-muted">
-                Explore what Bean Crate has to offer.
-            </p>
-        </div>
-
-        <div class="row g-3">
-            <div class="col-md-6 col-lg-3">
-                <div class="bean-category">
-                    <h3>Coffee</h3>
-                    <p class="mb-0">Your everyday favorites and specialty coffee drinks.</p>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3">
-                <div class="bean-category">
-                    <h3>Non-Coffee</h3>
-                    <p class="mb-0">Milk-based drinks, matcha, and refreshing choices.</p>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3">
-                <div class="bean-category">
-                    <h3>Meals & Snacks</h3>
-                    <p class="mb-0">Something satisfying to go with your drink.</p>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-3">
-                <div class="bean-category">
-                    <h3>Desserts</h3>
-                    <p class="mb-0">A little something sweet to complete your visit.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section class="text-center py-4 mb-3">
-        <h2 class="bean-section-title">Ready to order?</h2>
-        <p class="text-muted">
-            Browse the menu and find your next Bean Crate favorite.
+@if (isStaff)
+{
+    <div class="mb-4">
+        <div class="qrder-eyebrow">WORKSPACE OVERVIEW</div>
+        <h1 class="qrder-page-title">Overview</h1>
+        <p class="qrder-page-subtitle mb-0">
+            <span class="qrder-wordmark-inline">QRDER</span> counter operations, live queue status, and quick shortcuts.
         </p>
-        <a asp-controller="Products"
-           asp-action="Index"
-           class="btn bean-btn px-4">
-            Explore the Menu
-        </a>
-    </section>
-</div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="qrder-card h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <h2 class="h5 fw-bold mb-0">Counter Operations</h2>
+                        <span class="badge rounded-pill" style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1px solid var(--qrder-border);">
+                            @(isOwner ? "Owner Access" : "Staff Access")
+                        </span>
+                    </div>
+                    <p class="text-muted small mb-4">
+                        Record walk-in orders, monitor incoming table QR orders, and update preparation status from one workspace.
+                    </p>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <a asp-controller="Orders"
+                       asp-action="CreateForCustomer"
+                       class="btn menu-btn px-4 py-2 fw-semibold">
+                        + New Order
+                    </a>
+                    <a asp-controller="Orders"
+                       asp-action="Index"
+                       class="btn btn-outline-secondary px-3 py-2">
+                        Order Board
+                    </a>
+                    <a asp-controller="Products"
+                       asp-action="Index"
+                       class="btn btn-outline-secondary px-3 py-2">
+                        Menu Studio
+                    </a>
+                    <a asp-controller="Customers"
+                       asp-action="Index"
+                       class="btn btn-outline-secondary px-3 py-2">
+                        Customer Sessions
+                    </a>
+                    @if (isOwner)
+                    {
+                        <a asp-controller="Employees"
+                           asp-action="Index"
+                           class="btn btn-outline-secondary px-3 py-2">
+                            Staff Accounts
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="qrder-card h-100">
+                <h2 class="h5 fw-bold mb-3">Today&rsquo;s Snapshot</h2>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="qrder-callout">
+                            <div class="small text-muted">Orders Today</div>
+                            <div class="fs-4 fw-bold mt-1">@todayOrders</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="qrder-callout">
+                            <div class="small text-muted">Active Queue</div>
+                            <div class="fs-4 fw-bold mt-1">@activeOrders</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="qrder-callout">
+                            <div class="small text-muted">Unpaid / Pending</div>
+                            <div class="fs-4 fw-bold mt-1">@pendingPayments</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="qrder-callout">
+                            <div class="small text-muted">Completed Sales</div>
+                            <div class="fs-4 fw-bold mt-1">@todaySales</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="qrder-callout">
+        <div class="fw-bold mb-1">
+            Made for the <span class="qrder-wordmark-inline">QRDER</span> counter.
+        </div>
+        <div class="small text-muted">
+            A focused workspace for taking orders, confirming payment details, and keeping kitchen handoffs clear.
+        </div>
+    </div>
+}
+else
+{
+    var currentCustomer = ViewBag.CurrentCustomer as orderManagementSystem.Models.Customer;
+    var tableLabel = (TempData["EnteredTable"] as string) ?? (ViewBag.TableLabel as string) ?? string.Empty;
+    var enteredName = (TempData["EnteredName"] as string) ?? string.Empty;
+    int myOrdersCount = ViewBag.MyOrdersCount is int count ? count : 0;
+
+    <div class="mx-auto" style="max-width: 520px;">
+        <div class="qrder-card py-4 px-3 px-sm-4">
+            <div class="text-center mb-4">
+                <img src="~/images/qrder-logo.svg"
+                     alt="QRDER Logo"
+                     style="width: 64px; height: 64px; object-fit: contain;"
+                     class="mb-2" />
+                <div class="qrder-eyebrow">BEAN CRATE CAFE &middot; ORDERING</div>
+                <h1 class="h3 fw-bold mb-1">
+                    <span class="qrder-wordmark-inline">QRDER</span>
+                </h1>
+                <p class="text-muted small mb-0">
+                    Start your table session below to unlock the digital menu and send your order to the counter.
+                </p>
+            </div>
+
+            @if (TempData["SessionNotice"] is string sessionNotice)
+            {
+                <div class="alert alert-info small py-2 mb-3">@sessionNotice</div>
+            }
+
+            @if (TempData["SessionError"] is string sessionError)
+            {
+                <div class="alert alert-danger small py-2 mb-3">@sessionError</div>
+            }
+
+            @if (currentCustomer != null)
+            {
+                <div class="qrder-callout mb-3">
+                    <div class="small text-muted">Active Session</div>
+                    <div class="fs-5 fw-bold">@currentCustomer.DisplayName</div>
+                    <div class="small text-muted mt-1">
+                        Your session stays active for 10 minutes between actions.
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <a asp-controller="Products"
+                       asp-action="Index"
+                       class="btn menu-btn py-2 fw-semibold">
+                        Browse Menu &amp; Order
+                    </a>
+                    <a asp-controller="Orders"
+                       asp-action="MyOrders"
+                       class="btn btn-outline-secondary py-2">
+                        View My Orders @(myOrdersCount > 0 ? $"({myOrdersCount})" : "")
+                    </a>
+                </div>
+
+                <form asp-controller="Customers"
+                      asp-action="EndMySession"
+                      method="post"
+                      class="mt-3 text-center">
+                    <button type="submit" class="btn btn-link btn-sm text-muted text-decoration-none">
+                        End Current Session
+                    </button>
+                </form>
+            }
+            else
+            {
+                <form asp-controller="Customers" asp-action="Create" method="post">
+                    <input type="hidden" name="returnTo" value="home" />
+
+                    <div class="mb-3">
+                        <label for="tableLabel" class="form-label small fw-semibold">
+                            Table / Counter <span class="text-muted fw-normal">(Optional)</span>
+                        </label>
+                        <input type="text"
+                               id="tableLabel"
+                               name="tableLabel"
+                               value="@tableLabel"
+                               maxlength="15"
+                               class="form-control"
+                               placeholder="e.g., Table 1 or Takeout" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="DisplayName" class="form-label small fw-semibold">
+                            Your Name
+                        </label>
+                        <input type="text"
+                               id="DisplayName"
+                               name="DisplayName"
+                               value="@enteredName"
+                               minlength="2"
+                               maxlength="30"
+                               required
+                               class="form-control"
+                               placeholder="Enter your name (e.g., Juan)" />
+                        <div class="form-text small">
+                            2&ndash;30 characters. Used so our baristas can call your order.
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn menu-btn py-2 fw-semibold">
+                            Start Session &amp; Open Menu
+                        </button>
+                    </div>
+                </form>
+            }
+        </div>
+    </div>
+}
