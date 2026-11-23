@@ -13,7 +13,6 @@ public static class OrderStatuses
 public static class OrderPaymentMethods
 {
     public const string Cash = "Cash";
-    public const string PayMongo = "PayMongo";
 }
 
 public static class OrderPaymentStatuses

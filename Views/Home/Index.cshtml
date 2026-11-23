@@ -144,15 +144,32 @@ else
 
             @if (currentCustomer != null)
             {
+                var rawDisplay = currentCustomer.DisplayName ?? string.Empty;
+                var separatorIdx = rawDisplay.IndexOf(" - ", StringComparison.Ordinal);
+                var currentPrefix = separatorIdx > 0 ? rawDisplay[..separatorIdx].Trim() : string.Empty;
+                var currentBaseName = separatorIdx > 0 ? rawDisplay[(separatorIdx + 3)..].Trim() : rawDisplay;
+                var isTakeOut = currentPrefix.StartsWith("Take", StringComparison.OrdinalIgnoreCase);
+                var currentTableNum = !isTakeOut && currentPrefix.StartsWith("Table ", StringComparison.OrdinalIgnoreCase)
+                    ? currentPrefix[6..].Trim()
+                    : (!isTakeOut && !string.Equals(currentPrefix, "Dine-In", StringComparison.OrdinalIgnoreCase)
+                        ? currentPrefix
+                        : string.Empty);
+
                 <div class="qrder-callout mb-3">
-                    <div class="small text-muted">Active Session</div>
-                    <div class="fs-5 fw-bold">@currentCustomer.DisplayName</div>
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                        <div class="small text-muted">Active Session</div>
+                        <span class="badge rounded-pill"
+                              style="background-color: var(--qrder-espresso); color: #f6efe6;">
+                            @(isTakeOut ? "Take-Out" : "Dine-In")
+                        </span>
+                    </div>
+                    <div class="fs-5 fw-bold mt-1">@currentCustomer.DisplayName</div>
                     <div class="small text-muted mt-1">
                         Your session stays active for 10 minutes between actions.
                     </div>
                 </div>
 
-                <div class="d-grid gap-2">
+                <div class="d-grid gap-2 mb-3">
                     <a asp-controller="Products"
                        asp-action="Index"
                        class="btn menu-btn py-2 fw-semibold">
@@ -165,14 +182,91 @@ else
                     </a>
                 </div>
 
+                <details class="border rounded-3 p-3 mb-2" style="border-color: var(--qrder-border) !important; background-color: var(--qrder-surface);">
+                    <summary class="small fw-semibold" style="cursor: pointer;">
+                        Edit Name or Dine-In / Take-Out Preference
+                    </summary>
+
+                    <form asp-controller="Customers"
+                          asp-action="UpdateMySession"
+                          method="post"
+                          class="pt-3">
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold d-block mb-1">Dining Preference</label>
+                            <div class="btn-group w-100" role="group" aria-label="Dining preference">
+                                <input type="radio"
+                                       class="btn-check"
+                                       name="diningType"
+                                       id="prefDineIn"
+                                       value="DineIn"
+                                       checked="@(!isTakeOut)" />
+                                <label class="btn btn-sm btn-outline-secondary" for="prefDineIn">Dine-In</label>
+
+                                <input type="radio"
+                                       class="btn-check"
+                                       name="diningType"
+                                       id="prefTakeOut"
+                                       value="TakeOut"
+                                       checked="@(isTakeOut)" />
+                                <label class="btn btn-sm btn-outline-secondary" for="prefTakeOut">Take-Out</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-2 @(isTakeOut ? "d-none" : "")" id="editTableNumberGroup">
+                            <label for="editTableNumber" class="form-label small fw-semibold mb-1">
+                                Table Number <span class="text-muted fw-normal">(Optional)</span>
+                            </label>
+                            <input type="text"
+                                   id="editTableNumber"
+                                   name="tableNumber"
+                                   value="@currentTableNum"
+                                   maxlength="12"
+                                   class="form-control form-control-sm"
+                                   placeholder="e.g., 1 or Table 1" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="editDisplayName" class="form-label small fw-semibold mb-1">Your Name</label>
+                            <input type="text"
+                                   id="editDisplayName"
+                                   name="displayName"
+                                   value="@currentBaseName"
+                                   minlength="2"
+                                   maxlength="30"
+                                   required
+                                   class="form-control form-control-sm" />
+                        </div>
+
+                        <button type="submit" class="btn btn-sm menu-btn w-100 fw-semibold">
+                            Save Session Changes
+                        </button>
+                    </form>
+                </details>
+
                 <form asp-controller="Customers"
                       asp-action="EndMySession"
                       method="post"
-                      class="mt-3 text-center">
+                      class="mt-2 text-center">
                     <button type="submit" class="btn btn-link btn-sm text-muted text-decoration-none">
                         End Current Session
                     </button>
                 </form>
+
+                <script>
+                    (() => {
+                        const dineInRadio = document.getElementById("prefDineIn");
+                        const takeOutRadio = document.getElementById("prefTakeOut");
+                        const tableGroup = document.getElementById("editTableNumberGroup");
+
+                        function syncTableVisibility() {
+                            if (!tableGroup) return;
+                            tableGroup.classList.toggle("d-none", Boolean(takeOutRadio?.checked));
+                        }
+
+                        dineInRadio?.addEventListener("change", syncTableVisibility);
+                        takeOutRadio?.addEventListener("change", syncTableVisibility);
+                    })();
+                </script>
             }
             else
             {

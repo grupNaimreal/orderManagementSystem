@@ -1,42 +1,150 @@
+@*
+    Views/Customers/Index.cshtml
+    PC Customer Sessions & Table Directory for QRDER (Bean Crate Cafe):
+    - Displays active vs. expired session counts, quick status filter tabs,
+      and live AJAX search ordered newest-first.
+*@
 @model IEnumerable<orderManagementSystem.Models.Customer>
+
 @{
-    ViewData["Title"] = "Customer Accounts";
+    ViewData["Title"] = "Customer Sessions";
+    var customerList = Model.ToList();
+    var totalCount = customerList.Count;
+    var activeCount = customerList.Count(c => c.IsActive);
+    var expiredCount = customerList.Count(c => !c.IsActive);
 }
-<h1>Customer Accounts</h1>
-<p><a asp-action="Create" class="btn btn-primary w-100 w-sm-auto">Create Customer Session</a></p>
-<div class="mb-3">
-    <label for="customerSearch" class="form-label">Live search</label>
-    <input id="customerSearch" class="form-control" type="search"
-           placeholder="Search customer display names..."
-           data-search-url="@Url.Action("Search")" />
+
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; BEAN CRATE CAFE</div>
+        <h1 class="qrder-page-title">Customer Sessions</h1>
+        <p class="qrder-page-subtitle mb-0">
+            Monitor active table QR sessions and walk-in customer profiles, sorted newest-first.
+        </p>
+    </div>
+
+    <div>
+        <a asp-action="Create" class="btn menu-btn px-4 py-2 fw-semibold">
+            + New Customer Session
+        </a>
+    </div>
 </div>
-<div class="table-responsive">
-    <table class="table table-striped stack-table" id="customerTable">
-        <thead><tr><th>Name</th><th>Session</th><th>Last Activity (UTC)</th><th>Actions</th></tr></thead>
-        <tbody><partial name="_CustomerRows" model="Model" /></tbody>
-    </table>
+
+<div class="row g-3 mb-4">
+    <div class="col-4">
+        <div class="qrder-callout">
+            <div class="small text-muted">Total Sessions</div>
+            <div class="fs-4 fw-bold mt-1">@totalCount</div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="qrder-callout">
+            <div class="small text-muted">Active Now</div>
+            <div class="fs-4 fw-bold mt-1 text-success">@activeCount</div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="qrder-callout">
+            <div class="small text-muted">Ended / Expired</div>
+            <div class="fs-4 fw-bold mt-1 text-muted">@expiredCount</div>
+        </div>
+    </div>
 </div>
+
+<div class="qrder-card">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
+        <div class="d-flex flex-wrap gap-2" id="sessionFilterTabs" role="group" aria-label="Filter sessions">
+            <button type="button" class="btn btn-sm menu-btn px-3" data-session-filter="all">
+                All (@totalCount)
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-session-filter="active">
+                Active (@activeCount)
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-session-filter="inactive">
+                Ended / Expired (@expiredCount)
+            </button>
+        </div>
+
+        <div style="min-width: 250px;">
+            <label for="customerSearch" class="visually-hidden">Live search customer sessions</label>
+            <input id="customerSearch"
+                   class="form-control form-control-sm"
+                   type="search"
+                   placeholder="Search table or customer name..."
+                   data-search-url="@Url.Action("Search")" />
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle stack-table mb-0" id="customerTable">
+            <thead>
+                <tr>
+                    <th>Customer / Table</th>
+                    <th>Session Status</th>
+                    <th>Last Activity (PHT)</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <partial name="_CustomerRows" model="Model" />
+            </tbody>
+        </table>
+    </div>
+</div>
+
 @section Scripts {
-<script>
-(() => {
-    const input = document.getElementById("customerSearch");
-    const body = document.querySelector("#customerTable tbody");
-    let timer;
-    let controller;
-    input.addEventListener("input", () => {
-        clearTimeout(timer);
-        timer = setTimeout(async () => {
-            controller?.abort();
-            controller = new AbortController();
-            try {
-                const url = input.dataset.searchUrl + "?term=" + encodeURIComponent(input.value);
-                const response = await fetch(url, { signal: controller.signal });
-                if (response.ok) body.innerHTML = await response.text();
-            } catch (error) {
-                if (error.name !== "AbortError") console.error(error);
+    <script>
+        (() => {
+            const input = document.getElementById("customerSearch");
+            const body = document.querySelector("#customerTable tbody");
+            const filterBtns = document.querySelectorAll("[data-session-filter]");
+            let activeFilter = "all";
+            let timer;
+            let controller;
+
+            function applyRowFilter() {
+                if (!body) return;
+                body.querySelectorAll("tr").forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    const isInactive = text.includes("inactive") || text.includes("expired") || text.includes("ended");
+                    const show =
+                        activeFilter === "all" ||
+                        (activeFilter === "active" && !isInactive) ||
+                        (activeFilter === "inactive" && isInactive);
+                    row.classList.toggle("d-none", !show);
+                });
             }
-        }, 250);
-    });
-})();
-</script>
+
+            filterBtns.forEach(btn => {
+                btn.addEventListener("click", () => {
+                    activeFilter = btn.getAttribute("data-session-filter") || "all";
+                    filterBtns.forEach(b => {
+                        b.classList.remove("menu-btn");
+                        b.classList.add("btn-outline-secondary");
+                    });
+                    btn.classList.remove("btn-outline-secondary");
+                    btn.classList.add("menu-btn");
+                    applyRowFilter();
+                });
+            });
+
+            input?.addEventListener("input", () => {
+                clearTimeout(timer);
+                timer = setTimeout(async () => {
+                    controller?.abort();
+                    controller = new AbortController();
+                    try {
+                        const url = input.dataset.searchUrl + "?term=" + encodeURIComponent(input.value);
+                        const response = await fetch(url, { signal: controller.signal });
+                        if (response.ok && body) {
+                            body.innerHTML = await response.text();
+                            applyRowFilter();
+                        }
+                    } catch (error) {
+                        if (error.name !== "AbortError") console.error(error);
+                    }
+                }, 250);
+            });
+        })();
+    </script>
 }

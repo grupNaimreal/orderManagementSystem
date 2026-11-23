@@ -34,7 +34,8 @@ public class CustomersController : Controller
         await _customerSessionService.ExpireInactiveSessionsAsync();
         var customers = await _context.Customers
             .AsNoTracking()
-            .OrderBy(c => c.DisplayName)
+            .OrderByDescending(c => c.LastActivityUtc)
+            .ThenByDescending(c => c.Id)
             .ToListAsync();
         return View(customers);
     }
@@ -51,15 +52,11 @@ public class CustomersController : Controller
             query = query.Where(c => c.DisplayName.Contains(term));
         }
 
-        var customers = await query.OrderBy(c => c.DisplayName).ToListAsync();
+        var customers = await query
+            .OrderByDescending(c => c.LastActivityUtc)
+            .ThenByDescending(c => c.Id)
+            .ToListAsync();
         return PartialView("_CustomerRows", customers);
-    }
-
-    [AllowAnonymous]
-    public async Task<IActionResult> Create()
-    {
-        await _customerSessionService.ExpireInactiveSessionsAsync();
-        return View();
     }
 
     [AllowAnonymous]
@@ -223,6 +220,96 @@ public class CustomersController : Controller
             return RedirectToAction(nameof(Create));
 
         return View(customer);
+    }
+    
+    [AllowAnonymous]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateMySession(
+        string diningType = "DineIn",
+        string? tableNumber = null,
+        string displayName = "")
+    {
+        var currentCustomer = await _customerSessionService.GetCurrentCustomerAsync();
+        if (currentCustomer == null)
+        {
+            TempData["SessionNotice"] = "Your session expired. Start a new session below.";
+            return RedirectToAction("Index", "Home");
+        }
+
+        var cleanName = (displayName ?? string.Empty).Trim();
+        if (cleanName.Length < 2 || cleanName.Length > 30)
+        {
+            TempData["SessionError"] = "Please enter a valid name (2–30 characters).";
+            return RedirectToAction("Index", "Home");
+        }
+
+        string prefix;
+        if (string.Equals(diningType, "TakeOut", StringComparison.OrdinalIgnoreCase))
+        {
+            prefix = "Take-Out";
+        }
+        else
+        {
+            var rawTable = (tableNumber ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(rawTable))
+            {
+                prefix = "Dine-In";
+            }
+            else if (rawTable.StartsWith("Table", StringComparison.OrdinalIgnoreCase)
+                     || rawTable.StartsWith("Take", StringComparison.OrdinalIgnoreCase))
+            {
+                prefix = rawTable;
+            }
+            else
+            {
+                prefix = $"Table {rawTable}";
+            }
+        }
+
+        var combined = $"{prefix} - {cleanName}";
+        var updatedDisplayName = combined.Length > 30 ? combined[..30].Trim() : combined;
+
+        var activeCutoff = DateTime.UtcNow.AddMinutes(-10);
+        var nameInUse = await _context.Customers.AnyAsync(c =>
+            c.Id != currentCustomer.Id
+            && c.IsActive
+            && c.LastActivityUtc >= activeCutoff
+            && c.DisplayName == updatedDisplayName);
+
+        if (nameInUse)
+        {
+            TempData["SessionError"] = "That name/table label is already active. Please add an initial or adjust your name.";
+            return RedirectToAction("Index", "Home");
+        }
+
+        var trackedCustomer = await _context.Customers
+            .FirstOrDefaultAsync(c => c.Id == currentCustomer.Id);
+
+        if (trackedCustomer == null)
+        {
+            TempData["SessionNotice"] = "Your session ended. Please start a new session below.";
+            return RedirectToAction("Index", "Home");
+        }
+
+        trackedCustomer.DisplayName = updatedDisplayName;
+        trackedCustomer.LastActivityUtc = DateTime.UtcNow;
+
+        // Keep any open (Pending/Preparing) orders aligned with the updated table or take-out label
+        var openOrders = await _context.Orders
+            .Where(o => o.CustomerId == trackedCustomer.Id
+                     && (o.Status == OrderStatuses.Pending || o.Status == OrderStatuses.Preparing))
+            .ToListAsync();
+
+        foreach (var order in openOrders)
+        {
+            order.CustomerName = updatedDisplayName;
+        }
+
+        await _context.SaveChangesAsync();
+
+        TempData["SessionNotice"] = $"Session updated to \"{updatedDisplayName}\".";
+        return RedirectToAction("Index", "Home");
     }
 
     [AllowAnonymous]

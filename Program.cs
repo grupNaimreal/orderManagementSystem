@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using orderManagementSystem.Data;
@@ -26,12 +27,19 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromMinutes(10);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+});
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
 });
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CustomerSessionService>();
 builder.Services.AddScoped<AuditLogService>();
-builder.Services.AddHttpClient<PayMongoService>();
 builder.Services.AddHttpClient<MayaCheckoutService>();
 builder.Services.AddHostedService<UnpaidOrderExpiryService>();
 
@@ -39,6 +47,8 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 if (app.Environment.IsDevelopment())
 {
@@ -70,12 +80,28 @@ app.MapControllerRoute(
 app.MapRazorPages()
    .WithStaticAssets();
 
-await orderManagementSystem.Security.IdentitySeeder.SeedAsync(app.Services, app.Configuration);
-
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await dbContext.Database.MigrateAsync();
+
+    // Ensure AuditLogs table exists in production even if an EF migration was skipped
+    await dbContext.Database.ExecuteSqlRawAsync("""
+        CREATE TABLE IF NOT EXISTS "AuditLogs" (
+            "Id" INTEGER NOT NULL CONSTRAINT "PK_AuditLogs" PRIMARY KEY AUTOINCREMENT,
+            "TimestampUtc" TEXT NOT NULL,
+            "ActorName" TEXT NOT NULL,
+            "ActorRole" TEXT NOT NULL,
+            "ActionType" TEXT NOT NULL,
+            "EntityName" TEXT NOT NULL,
+            "EntityId" TEXT NULL,
+            "Details" TEXT NOT NULL
+        );
+        """);
+
     await MenuSeeder.SeedAsync(dbContext);
 }
+
+await orderManagementSystem.Security.IdentitySeeder.SeedAsync(app.Services, app.Configuration);
 
 app.Run();

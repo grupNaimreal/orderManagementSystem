@@ -1,52 +1,142 @@
+@*
+    Views/Orders/MyOrders.cshtml
+    Mobile-first Customer Order History & Live Status Tracker for QRDER (Bean Crate Cafe):
+    - Displays all orders placed during the customer's active session.
+    - Automatically polls for status updates every 8 seconds while any order is Pending or Preparing.
+*@
 @model IEnumerable<orderManagementSystem.Models.Order>
 
 @{
     ViewData["Title"] = "My Orders";
+    var ordersList = Model.ToList();
+    var manilaTz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+    var hasActiveOrders = ordersList.Any(o => o.Status == "Pending" || o.Status == "Preparing");
+    var statusSignature = string.Join("|", ordersList.Select(o => $"{o.Id}:{o.Status}:{o.PaymentStatus}"));
+
+    string StatusBadgeStyle(string status) => status switch
+    {
+        "Pending" => "background-color: #fff3cd; color: #664d03; border: 1px solid #ffecb5;",
+        "Preparing" => "background-color: #cfe2ff; color: #084298; border: 1px solid #b6d4fe;",
+        "Completed" => "background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;",
+        "Cancelled" => "background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7;",
+        _ => "background-color: var(--qrder-cream-soft); color: var(--qrder-ink);"
+    };
 }
 
-<h1>My Orders</h1>
-
-<p>
-    <a asp-action="Create" class="btn btn-primary w-100 w-sm-auto">
-        Place Another Order
-    </a>
-</p>
-
-@if (!Model.Any())
-{
-    <p class="text-muted">You haven't placed any orders yet.</p>
-}
-else
-{
-    <div class="table-responsive">
-        <table class="table table-striped stack-table">
-            <thead>
-                <tr>
-                    <th>Order #</th>
-                    <th>Date</th>
-                    <th>Total</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var order in Model)
-                {
-                    <tr>
-                        <td data-label="Order #">#@order.Id</td>
-                        <td data-label="Date">@order.OrderDate.ToLocalTime().ToString("MMM dd, yyyy hh:mm tt")</td>
-                        <td data-label="Total">₱@order.TotalAmount.ToString("N2")</td>
-                        <td data-label="Status">@order.Status</td>
-                        <td data-label="Action">
-                            <a asp-action="Details"
-                               asp-route-id="@order.Id"
-                               class="btn btn-sm btn-outline-primary">
-                                View Details
-                            </a>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; BEAN CRATE CAFE</div>
+        <h1 class="h3 fw-bold mb-0">My Orders</h1>
     </div>
+
+    <a asp-controller="Products" asp-action="Index" class="btn btn-sm menu-btn px-3 fw-semibold">
+        + Order More
+    </a>
+</div>
+
+@if (hasActiveOrders)
+{
+    <div class="d-flex align-items-center justify-content-between gap-2 px-3 py-2 mb-3 rounded-3 small"
+         style="background-color: var(--qrder-cream-soft); border: 1px solid var(--qrder-border);">
+        <span class="fw-semibold">
+            <span class="text-success me-1">&#9679;</span>
+            Live Order Tracking Active
+        </span>
+        <span class="text-muted">Updates automatically</span>
+    </div>
+}
+
+<div id="qrderMyOrdersRoot" data-status-signature="@statusSignature">
+    @if (!ordersList.Any())
+    {
+        <div class="qrder-card text-center py-5">
+            <h2 class="h5 fw-bold mb-2">No orders yet</h2>
+            <p class="text-muted small mb-3">
+                Browse the Bean Crate Cafe menu to place your first order.
+            </p>
+            <a asp-controller="Products" asp-action="Index" class="btn menu-btn px-4">
+                Browse Menu
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex flex-column gap-3">
+            @foreach (var order in ordersList)
+            {
+                var localDate = TimeZoneInfo.ConvertTimeFromUtc(
+                    DateTime.SpecifyKind(order.OrderDate, DateTimeKind.Utc),
+                    manilaTz
+                );
+
+                <a asp-action="Details"
+                   asp-route-id="@order.Id"
+                   class="qrder-card text-decoration-none text-reset d-block">
+                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                        <span class="fw-bold fs-5">Order #@order.Id</span>
+                        <span class="badge rounded-pill" style="@StatusBadgeStyle(order.Status)">
+                            @order.Status
+                        </span>
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 small text-muted mb-2">
+                        <span>@localDate.ToString("MMM dd, yyyy · hh:mm tt") (PHT)</span>
+                        <span>@order.PaymentMethod (@order.PaymentStatus)</span>
+                    </div>
+
+                    @if (order.PaymentMethod == "Maya" && order.PaymentStatus == "Pending" && order.Status == "Pending")
+                    {
+                        <div class="small fw-semibold px-2 py-1 mb-2 rounded-2"
+                             style="background-color: #fff3cd; color: #664d03; border: 1px solid #ffecb5;">
+                            Action needed: Tap to complete Maya Sandbox payment
+                        </div>
+                    }
+
+                    <div class="d-flex justify-content-between align-items-center border-top pt-2">
+                        <span class="small fw-semibold" style="color: var(--qrder-espresso);">
+                            View Receipt &amp; Details &rarr;
+                        </span>
+                        <span class="fw-bold fs-6">₱@order.TotalAmount.ToString("N2")</span>
+                    </div>
+                </a>
+            }
+        </div>
+    }
+</div>
+
+@if (hasActiveOrders)
+{
+    <script>
+        (() => {
+            const rootEl = document.getElementById("qrderMyOrdersRoot");
+            if (!rootEl) return;
+
+            const initialSig = rootEl.getAttribute("data-status-signature") || "";
+
+            async function pollMyOrders() {
+                if (document.hidden) return;
+                try {
+                    const response = await fetch(window.location.href, {
+                        headers: { "X-Requested-With": "XMLHttpRequest" },
+                        cache: "no-store"
+                    });
+                    if (!response.ok) return;
+
+                    const html = await response.text();
+                    const doc = new DOMParser().parseFromString(html, "text/html");
+                    const nextRoot = doc.getElementById("qrderMyOrdersRoot");
+                    if (!nextRoot) return;
+
+                    const nextSig = nextRoot.getAttribute("data-status-signature") || "";
+                    if (nextSig !== initialSig) {
+                        window.location.reload();
+                    }
+                } catch {
+                    // Retry silently on next tick
+                }
+            }
+
+            setInterval(pollMyOrders, 8000);
+        })();
+    </script>
 }

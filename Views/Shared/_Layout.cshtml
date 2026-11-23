@@ -1,9 +1,10 @@
 @*
     Views/Shared/_Layout.cshtml
     Shared application shell for QRDER (Bean Crate Cafe):
-    - Owner / Employee (PC POS Workspace): Fixed left dark-brown sidebar + fluid cream desktop workspace.
+    - Owner / Employee (PC POS Workspace): Fixed left dark-brown sidebar with permanently
+      emphasized "+ New Order" action, upgraded Log Out button, and fluid cream workspace.
     - Customer / Unauthenticated (Mobile-Priority, PC-Adaptive): Clean dark-espresso top bar
-      with properly sized QRDER logo, Home link, theme toggle, and high-contrast Login/Account controls.
+      locked to Light Mode with QRDER logo and Login/Account controls.
 *@
 @{
     var isOwner = User.IsInRole("Owner");
@@ -28,7 +29,7 @@
     var bodyClass = isStaff ? "qrder-pos-body" : "qrder-mobile-body";
 }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="light" data-theme="light">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -40,6 +41,101 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/orderManagementSystem.styles.css" asp-append-version="true" />
+    <style>
+        /* Permanent emphasis for + New Order in the staff POS sidebar */
+        .qrder-sidebar-nav .qrder-nav-item-featured {
+            background: linear-gradient(135deg, rgba(237, 224, 201, 0.22) 0%, rgba(192, 88, 0, 0.30) 100%);
+            border: 1px solid rgba(237, 224, 201, 0.48);
+            color: #fff8ef !important;
+            font-weight: 700;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+            margin-top: 0.2rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .qrder-sidebar-nav .qrder-nav-item-featured .qrder-featured-plus {
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+            background-color: #C05800;
+            color: #ffffff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 0.95rem;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+
+        .qrder-sidebar-nav .qrder-nav-item-featured:hover,
+        .qrder-sidebar-nav .qrder-nav-item-featured.active {
+            background: #ede0c9 !important;
+            border-color: #ede0c9 !important;
+            color: #2b1d16 !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+        }
+
+        .qrder-sidebar-nav .qrder-nav-item-featured:hover .qrder-featured-plus,
+        .qrder-sidebar-nav .qrder-nav-item-featured.active .qrder-featured-plus {
+            background-color: #4A1C05;
+            color: #fff8ef;
+        }
+
+        /* Upgraded Staff Sidebar Account & Logout Styling */
+        .qrder-sidebar-account .qrder-account-list {
+            list-style: none;
+            margin: 0 0 0.65rem 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+        }
+
+        .qrder-sidebar-account .qrder-account-user-link {
+            display: block;
+            padding: 0.4rem 0.65rem;
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            color: #f6efe6 !important;
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-decoration: none !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
+        }
+
+        .qrder-sidebar-account .qrder-account-user-link:hover {
+            background-color: rgba(255, 255, 255, 0.14);
+            color: #ffffff !important;
+        }
+
+        .qrder-sidebar-account .qrder-logout-btn {
+            width: 100%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            padding: 0.48rem 0.75rem;
+            border-radius: 10px;
+            background-color: rgba(220, 53, 69, 0.20);
+            border: 1px solid rgba(248, 113, 113, 0.48);
+            color: #ffd8dc !important;
+            font-size: 0.84rem;
+            font-weight: 700;
+            text-decoration: none !important;
+            transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+        }
+
+        .qrder-sidebar-account .qrder-logout-btn:hover {
+            background-color: #dc3545;
+            border-color: #dc3545;
+            color: #ffffff !important;
+        }
+    </style>
 </head>
 <body class="@bodyClass">
     @if (isStaff)
@@ -67,9 +163,9 @@
                         <span>Overview</span>
                     </a>
 
-                    <a class="qrder-nav-item @(IsActive("Orders", "CreateForCustomer") ? "active" : "")"
+                    <a class="qrder-nav-item qrder-nav-item-featured @(IsActive("Orders", "CreateForCustomer") ? "active" : "")"
                        asp-controller="Orders" asp-action="CreateForCustomer">
-                        <span class="qrder-nav-icon" aria-hidden="true">&#43;</span>
+                        <span class="qrder-featured-plus" aria-hidden="true">&#43;</span>
                         <span>New Order</span>
                     </a>
 
@@ -157,7 +253,7 @@
     }
     else
     {
-        @* Mobile-Priority, PC-Adaptive Customer Shell *@
+        @* Mobile-Priority, PC-Adaptive Customer Shell (Always Light Mode) *@
         <header class="qrder-mobile-header sticky-top">
             <div class="qrder-mobile-container d-flex align-items-center justify-content-between gap-2">
                 <a class="qrder-mobile-brand" asp-controller="Home" asp-action="Index">
@@ -175,12 +271,6 @@
                 </a>
 
                 <div class="d-flex align-items-center gap-2">
-                    <button type="button"
-                            id="themeToggle"
-                            class="btn btn-sm qrder-mobile-icon-btn"
-                            title="Toggle color theme">
-                        &#127769;
-                    </button>
                     <div class="qrder-mobile-login">
                         <partial name="_LoginPartial" />
                     </div>

@@ -1,6 +1,6 @@
 // Services/UnpaidOrderExpiryService.cs
 // Background worker that cancels unpaid Pending orders after 10 minutes,
-// checking Maya Checkout Sandbox and PayMongo before expiring online orders.
+// checking Maya Checkout Sandbox before expiring online orders.
 
 using Microsoft.EntityFrameworkCore;
 using orderManagementSystem.Data;
@@ -47,7 +47,6 @@ public sealed class UnpaidOrderExpiryService : BackgroundService
         await using var scope = _scopeFactory.CreateAsyncScope();
 
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var payMongo = scope.ServiceProvider.GetRequiredService<PayMongoService>();
         var mayaCheckout = scope.ServiceProvider.GetRequiredService<MayaCheckoutService>();
 
         var cutoff = DateTime.UtcNow.AddMinutes(-10);
@@ -102,40 +101,6 @@ public sealed class UnpaidOrderExpiryService : BackgroundService
                 }
 
                 continue;
-            }
-
-            if (order.PaymentMethod == OrderPaymentMethods.PayMongo)
-            {
-                if (string.IsNullOrWhiteSpace(order.PayMongoCheckoutSessionId))
-                {
-                    MarkExpired(order);
-                    continue;
-                }
-
-                try
-                {
-                    var session = await payMongo.ExpireAndRetrieveCheckoutSessionAsync(
-                        order.PayMongoCheckoutSessionId,
-                        cancellationToken);
-
-                    if (!string.IsNullOrWhiteSpace(session.PaidPaymentId))
-                    {
-                        order.PayMongoPaymentId = session.PaidPaymentId;
-                        order.PaymentStatus = OrderPaymentStatuses.Paid;
-                        order.PaymentPaidAtUtc = session.PaidAtUtc ?? DateTime.UtcNow;
-                    }
-                    else if (session.Status.Equals("expired", StringComparison.OrdinalIgnoreCase))
-                    {
-                        MarkExpired(order);
-                    }
-                }
-                catch (Exception exception) when (exception is not OperationCanceledException)
-                {
-                    _logger.LogWarning(
-                        exception,
-                        "Could not expire or verify PayMongo session for order {OrderId}.",
-                        order.Id);
-                }
             }
         }
 

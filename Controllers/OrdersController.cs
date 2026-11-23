@@ -1,6 +1,6 @@
 // Controllers/OrdersController.cs
 // Handles customer mobile orders and staff counter orders for QRDER (Bean Crate Cafe),
-// including Cash, Maya Checkout Sandbox (QRPh / Maya Wallet / Card), and PayMongo flows.
+// including Cash and Maya Checkout Sandbox (QRPh / Maya Wallet / Card) flows.
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,20 +16,17 @@ public class OrdersController : Controller
 {
     private readonly ApplicationDbContext _context;
     private readonly CustomerSessionService _customerSessionService;
-    private readonly PayMongoService _payMongoService;
     private readonly MayaCheckoutService _mayaCheckoutService;
     private readonly AuditLogService _auditLog;
 
     public OrdersController(
         ApplicationDbContext context,
         CustomerSessionService customerSessionService,
-        PayMongoService payMongoService,
         MayaCheckoutService mayaCheckoutService,
         AuditLogService auditLog)
     {
         _context = context;
         _customerSessionService = customerSessionService;
-        _payMongoService = payMongoService;
         _mayaCheckoutService = mayaCheckoutService;
         _auditLog = auditLog;
     }
@@ -138,7 +135,7 @@ public class OrdersController : Controller
             ModelState.AddModelError(string.Empty, "Please add at least one product to the order.");
         }
 
-        var allowedMethods = new[] { OrderPaymentMethods.Cash, "Maya", OrderPaymentMethods.PayMongo };
+        var allowedMethods = new[] { OrderPaymentMethods.Cash, "Maya" };
         if (string.IsNullOrWhiteSpace(model.PaymentMethod)
             || !allowedMethods.Contains(model.PaymentMethod, StringComparer.OrdinalIgnoreCase))
         {
@@ -251,11 +248,6 @@ public class OrdersController : Controller
         if (!model.IsStaffOrder && order.PaymentMethod == "Maya")
         {
             return await InitiateMayaRedirectAsync(order);
-        }
-
-        if (!model.IsStaffOrder && order.PaymentMethod == OrderPaymentMethods.PayMongo)
-        {
-            return await StartPayMongoCheckout(order.Id);
         }
 
         return RedirectToAction(nameof(Details), new { id = order.Id });
@@ -464,43 +456,6 @@ public class OrdersController : Controller
         return RedirectToAction(nameof(Details), new { id = order.Id });
     }
 
-    // CUSTOMER: retry or resume PayMongo checkout if selected
-    [AllowAnonymous]
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> StartPayMongoCheckout(int id)
-    {
-        var customer = await _customerSessionService.GetCurrentCustomerAsync();
-
-        if (customer == null)
-            return RedirectToAction("Index", "Home");
-
-        var order = await _context.Orders
-            .Include(o => o.Items)
-            .FirstOrDefaultAsync(o => o.Id == id && o.CustomerId == customer.Id);
-
-        if (order == null)
-            return NotFound();
-
-        try
-        {
-            var successUrl = BuildCallbackUrl(nameof(Details), "Orders", new { id = order.Id });
-            var cancelUrl = BuildCallbackUrl(nameof(Details), "Orders", new { id = order.Id });
-
-            var session = await _payMongoService.CreateCheckoutSessionAsync(order, successUrl, cancelUrl);
-            order.PayMongoCheckoutSessionId = session.Id;
-            order.PayMongoCheckoutUrl = session.CheckoutUrl;
-            await _context.SaveChangesAsync();
-
-            return Redirect(session.CheckoutUrl);
-        }
-        catch (Exception ex)
-        {
-            TempData["PaymentError"] = ex.Message;
-            return RedirectToAction(nameof(Details), new { id = order.Id });
-        }
-    }
-
     // CUSTOMER: view only their own orders
     [AllowAnonymous]
     public async Task<IActionResult> MyOrders()
@@ -581,7 +536,11 @@ public class OrdersController : Controller
     // STAFF: advance order preparation / completion status
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateStatus(int id, string status)
+    public async Task<IActionResult> UpdateStatus(
+        int id,
+        string status,
+        string? cancellationPreset = null,
+        string? cancellationReason = null)
     {
         var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == id);
 
@@ -607,11 +566,32 @@ public class OrdersController : Controller
         order.Status = status;
         await _context.SaveChangesAsync();
 
-        await _auditLog.LogAsync(
-            "OrderStatusUpdated",
-            "Order",
-            order.Id.ToString(),
-            $"Updated Order #{order.Id} status from {oldStatus} to {status}.");
+        if (status == OrderStatuses.Cancelled)
+        {
+            var preset = (cancellationPreset ?? string.Empty).Trim();
+            var customNote = (cancellationReason ?? string.Empty).Trim();
+            var combinedReason = string.Join(" — ", new[] { preset, customNote }.Where(s => !string.IsNullOrWhiteSpace(s)));
+            if (string.IsNullOrWhiteSpace(combinedReason))
+            {
+                combinedReason = "Cancelled by staff";
+            }
+
+            await _auditLog.LogAsync(
+                "OrderCancelled",
+                "Order",
+                order.Id.ToString(),
+                $"Cancelled Order #{order.Id} (was {oldStatus}). Reason: {combinedReason}");
+
+            TempData["OrderNotice"] = $"Order #{order.Id} cancelled ({combinedReason}) and recorded in the Audit Trail.";
+        }
+        else
+        {
+            await _auditLog.LogAsync(
+                "OrderStatusUpdated",
+                "Order",
+                order.Id.ToString(),
+                $"Updated Order #{order.Id} status from {oldStatus} to {status}.");
+        }
 
         return RedirectToAction(nameof(Details), new { id = order.Id });
     }

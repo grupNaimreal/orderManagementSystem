@@ -151,6 +151,18 @@
 
 @if (isStaff)
 {
+    var staffCategories = productsList
+        .GroupBy(p => string.IsNullOrWhiteSpace(p.Category?.Name) ? "Other" : p.Category!.Name.Trim())
+        .Select(g => new
+        {
+            Name = g.Key,
+            Count = g.Count(),
+            SortOrder = orderManagementSystem.Data.MenuSeeder.GetCategorySortOrder(g.Key)
+        })
+        .OrderBy(c => c.SortOrder)
+        .ThenBy(c => c.Name)
+        .ToList();
+
     <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
         <div>
             <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; BEAN CRATE CAFE</div>
@@ -200,13 +212,29 @@
     </div>
 
     <div class="qrder-card mb-4">
-        <div class="menu-search">
+        <div class="menu-search mb-3">
             <label for="productSearch" class="visually-hidden">Search menu items</label>
             <input id="productSearch"
                    class="form-control"
                    type="search"
                    placeholder="Search drinks, meals, and more..."
                    data-url="@Url.Action("Search")" />
+        </div>
+
+        <div class="d-flex flex-wrap gap-2" id="staffCategoryFilterBar" role="group" aria-label="Filter menu by category">
+            <button type="button"
+                    class="btn btn-sm menu-btn px-3"
+                    data-staff-category="all">
+                All (@totalProducts)
+            </button>
+            @foreach (var cat in staffCategories)
+            {
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary px-3"
+                        data-staff-category="@cat.Name">
+                    @cat.Name (@cat.Count)
+                </button>
+            }
         </div>
     </div>
 
@@ -349,9 +377,11 @@ else
             const categoryProducts = document.getElementById('categoryProductsSection');
             const backBtn = document.getElementById('backToCategoriesBtn');
             const headingEl = document.getElementById('activeCategoryHeading');
+            const staffFilterBtns = document.querySelectorAll('[data-staff-category]');
             const isCustomerView = Boolean(categoryPicker && categoryProducts);
 
             let selectedCategory = null;
+            let activeStaffCategory = 'all';
             let timer;
             let request;
 
@@ -360,10 +390,23 @@ else
                 const cards = grid.querySelectorAll('[data-product-col]');
                 cards.forEach(col => {
                     const itemCat = col.getAttribute('data-category') || 'Other';
-                    const show = !categoryName || itemCat.toLowerCase() === categoryName.toLowerCase();
+                    const show = !categoryName || categoryName === 'all' || itemCat.toLowerCase() === categoryName.toLowerCase();
                     col.classList.toggle('d-none', !show);
                 });
             }
+
+            staffFilterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    activeStaffCategory = btn.getAttribute('data-staff-category') || 'all';
+                    staffFilterBtns.forEach(b => {
+                        b.classList.remove('menu-btn');
+                        b.classList.add('btn-outline-secondary');
+                    });
+                    btn.classList.remove('btn-outline-secondary');
+                    btn.classList.add('menu-btn');
+                    filterGridByCategory(activeStaffCategory);
+                });
+            });
 
             function openCategory(categoryName) {
                 selectedCategory = categoryName;
@@ -451,6 +494,8 @@ else
                                 if (headingEl) headingEl.textContent = `Search results for "${term}"`;
                                 categoryPicker?.classList.add('d-none');
                                 categoryProducts?.classList.remove('d-none');
+                            } else {
+                                filterGridByCategory(activeStaffCategory);
                             }
                         }
                     } catch (error) {

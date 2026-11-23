@@ -1,6 +1,6 @@
 // Controllers/ReportsController.cs
 // Generates daily, weekly, monthly, and custom-range Sales Reports for Owner and Employee PC users,
-// including 12% VAT breakdown, Cash vs. Online (Maya / PayMongo) totals, top-selling products, and CSV export.
+// including 12% VAT breakdown, Cash vs. Online (Maya) totals, top-selling products, and CSV export.
 
 using System.Globalization;
 using System.Text;
@@ -58,7 +58,7 @@ public class ReportsController : Controller
             .Sum(o => o.TotalAmount);
 
         decimal cashlessSales = validOrders
-            .Where(o => o.PaymentMethod == "Maya" || o.PaymentMethod == OrderPaymentMethods.PayMongo)
+            .Where(o => o.PaymentMethod == "Maya")
             .Sum(o => o.TotalAmount);
 
         var topProducts = validOrders
@@ -103,7 +103,7 @@ public class ReportsController : Controller
         var phOffset = TimeSpan.FromHours(8);
         var startUtc = startLocal.Date.Subtract(phOffset);
         var endUtc = endLocal.Date.AddDays(1).Subtract(phOffset);
-        var manilaTz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+        var manilaTz = ResolveManilaTimeZone();
 
         var orders = await _context.Orders
             .Where(o => o.OrderDate >= startUtc && o.OrderDate < endUtc)
@@ -147,6 +147,16 @@ public class ReportsController : Controller
         var fileName = $"qrder-beancrate-sales-{startLocal:yyyyMMdd}-to-{endLocal:yyyyMMdd}.csv";
         var bytes = Encoding.UTF8.GetBytes(sb.ToString());
         return File(bytes, "text/csv", fileName);
+    }
+
+    private static TimeZoneInfo ResolveManilaTimeZone()
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila"); }
+        catch
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time"); }
+            catch { return TimeZoneInfo.CreateCustomTimeZone("PHT", TimeSpan.FromHours(8), "Philippine Standard Time", "PHT"); }
+        }
     }
 
     private static (DateTime StartLocal, DateTime EndLocal, string NormalizedRange) ResolveDateRange(

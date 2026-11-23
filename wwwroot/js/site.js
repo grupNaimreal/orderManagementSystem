@@ -1,5 +1,6 @@
 ﻿// wwwroot/js/site.js
-// Handles QRDER light/dark theme persistence and responsive sidebar toggling for narrow screens.
+// Handles QRDER light/dark theme persistence for Owner/Staff POS pages,
+// enforces Light Mode on Customer/Public pages, and toggles the narrow-screen sidebar drawer.
 (() => {
 const root = document.documentElement;
 const toggle = document.getElementById("themeToggle");
@@ -7,33 +8,33 @@ const storageKey = "qrderTheme";
 const legacyKey = "beanCrateTheme";
 
 const savedTheme = localStorage.getItem(storageKey) || localStorage.getItem(legacyKey);
-const isCompactButton = document.body?.classList.contains("qrder-mobile-body");
+const isCustomerSide = document.body?.classList.contains("qrder-mobile-body");
 
 function applyTheme(theme) {
-    root.setAttribute("data-bs-theme", theme);
-    root.setAttribute("data-theme", theme);
+    const effectiveTheme = isCustomerSide ? "light" : theme;
+    root.setAttribute("data-bs-theme", effectiveTheme);
+    root.setAttribute("data-theme", effectiveTheme);
 
-    if (toggle) {
-        if (isCompactButton) {
-            toggle.textContent = theme === "dark" ? "☀️" : "🌙";
-        } else {
-            toggle.textContent = theme === "dark" ? "☀️ Light Mode" : "🌙 Dark Mode";
-        }
-
+    if (toggle && !isCustomerSide) {
+        toggle.textContent = effectiveTheme === "dark" ? "☀️ Light Mode" : "🌙 Dark Mode";
         toggle.setAttribute(
             "aria-label",
-            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+            effectiveTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"
         );
     }
 }
 
-applyTheme(savedTheme === "dark" ? "dark" : "light");
+if (isCustomerSide) {
+    applyTheme("light");
+} else {
+    applyTheme(savedTheme === "dark" ? "dark" : "light");
 
-toggle?.addEventListener("click", () => {
-    const nextTheme = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
-    localStorage.setItem(storageKey, nextTheme);
-    applyTheme(nextTheme);
-});
+    toggle?.addEventListener("click", () => {
+        const nextTheme = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+        localStorage.setItem(storageKey, nextTheme);
+        applyTheme(nextTheme);
+    });
+}
 
 // Responsive sidebar drawer controls for Owner/Staff viewports < 992px
 const sidebar = document.getElementById("qrderSidebar");
@@ -54,3 +55,4 @@ sidebarBackdrop?.addEventListener("click", closeSidebar);
 
 
 })();
+
