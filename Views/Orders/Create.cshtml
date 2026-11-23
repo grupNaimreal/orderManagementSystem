@@ -1,8 +1,20 @@
+@*
+    Views/Orders/Create.cshtml
+    Dual-mode Order Builder for QRDER (Bean Crate Cafe):
+    - Staff Counter Mode (Model.IsStaffOrder == true): Two-column PC workspace
+      with customer session picker, line-item customizer, and live sticky Order Summary.
+    - Customer Mobile Mode (Model.IsStaffOrder == false):
+      * Each item displays its corresponding photo on the left side.
+      * Pre-selected items are locked (read-only summary) unless the customer clicks "Edit".
+      * Add-ons are ordered cheapest-first.
+      * Only one "+ Add Item" button (redundant "+ Add Another Product" removed).
+      * Prominent visual payment method selector & chosen payment banner.
+*@
 @using System.Text.Json
 @model orderManagementSystem.Models.OrderCreateViewModel
 
 @{
-    ViewData["Title"] = "Create Order";
+    ViewData["Title"] = Model.IsStaffOrder ? "New Counter Order" : "Place Order";
     var actionName = Model.IsStaffOrder ? "CreateForCustomer" : "Create";
     var savedItems = Model.Items.Select(i => new
     {
@@ -11,130 +23,361 @@
         i.VariantOptionId,
         AddOnOptionIds = i.AddOnOptionIds ?? new List<int>()
     });
+    var productMeta = ViewBag.ProductMeta ?? new Dictionary<int, object>();
 }
 
-<h1>Create Order</h1>
+<style>
+    .qrder-order-thumb {
+        position: relative;
+        width: 84px;
+        height: 84px;
+        border-radius: 12px;
+        overflow: hidden;
+        flex-shrink: 0;
+        background-color: var(--qrder-cream-soft);
+        border: 1px solid var(--qrder-border);
+    }
 
-@if (Model.IsStaffOrder)
-{
-    <p class="text-muted">Create an order on behalf of a customer.</p>
-}
-else
-{
-    <p class="text-muted">Choose your products and customize your order.</p>
-}
+    .qrder-order-thumb img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        display: block;
+    }
 
-<form asp-controller="Orders" asp-action="@actionName" method="post">
-    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+    .qrder-order-thumb-fallback {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.35rem;
+        text-align: center;
+        font-size: 0.68rem;
+        font-weight: 700;
+        line-height: 1.15;
+        background: linear-gradient(135deg, #f3e5d8 0%, #e4ccb6 100%);
+        color: #4A1C05;
+    }
+
+    .qrder-pay-choice {
+        border: 2px solid var(--qrder-border);
+        border-radius: 14px;
+        background-color: var(--qrder-surface);
+        padding: 0.95rem 1rem;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+        width: 100%;
+        height: 100%;
+    }
+
+    .qrder-pay-choice:hover {
+        border-color: var(--qrder-espresso);
+    }
+
+    .qrder-pay-choice.active {
+        border-color: var(--qrder-espresso);
+        background-color: var(--qrder-cream-soft);
+        box-shadow: 0 4px 14px rgba(54, 36, 28, 0.10);
+    }
+
+    .qrder-pay-selected-pill {
+        background-color: var(--qrder-espresso);
+        color: #f6efe6;
+        font-size: 0.7rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+</style>
+
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-4">
+    <div>
+        <div class="qrder-eyebrow">
+            <span class="qrder-wordmark-inline">QRDER</span> &middot; @(Model.IsStaffOrder ? "COUNTER POS" : "MOBILE ORDER")
+        </div>
+        <h1 class="qrder-page-title mb-1">
+            @(Model.IsStaffOrder ? "New Order" : "Place Your Order")
+        </h1>
+        <p class="qrder-page-subtitle mb-0">
+            @(Model.IsStaffOrder
+                ? "Record a walk-in or assisted customer order directly into the Bean Crate Cafe queue."
+                : "Review your chosen items, confirm your payment method, and submit to the counter.")
+        </p>
+    </div>
 
     @if (Model.IsStaffOrder)
     {
-        <div class="mb-4">
-            <label asp-for="CustomerId" class="form-label">Customer</label>
-            <select asp-for="CustomerId" class="form-select" required>
-                <option value="">Select a customer</option>
-                @foreach (var customer in Model.Customers)
+        <div class="d-flex flex-wrap gap-2">
+            <a asp-controller="Customers"
+               asp-action="Create"
+               class="btn btn-outline-secondary btn-sm px-3">
+                + New Customer Session
+            </a>
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm px-3">
+                Order Board
+            </a>
+        </div>
+    }
+</div>
+
+@if (Model.Products.Count == 0)
+{
+    <div class="alert alert-warning mb-4">
+        There are currently no available products to order.
+    </div>
+}
+
+<form asp-controller="Orders" asp-action="@actionName" method="post" id="qrderOrderForm">
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+    <div class="row g-4">
+        @* Primary Column: Customer/Payment Setup & Line Items *@
+        <div class="@(Model.IsStaffOrder ? "col-lg-8" : "col-12")">
+            <div class="qrder-card mb-4">
+                @if (Model.IsStaffOrder)
                 {
-                    <option value="@customer.Id">@customer.DisplayName</option>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <label asp-for="CustomerId" class="form-label fw-bold mb-0">Customer / Table Session</label>
+                        <a asp-controller="Customers" asp-action="Create" class="small text-decoration-none">
+                            Create new session &rarr;
+                        </a>
+                    </div>
+                    <select asp-for="CustomerId" class="form-select" required>
+                        <option value="">Select an active customer session...</option>
+                        @foreach (var customer in Model.Customers)
+                        {
+                            <option value="@customer.Id">@customer.DisplayName</option>
+                        }
+                    </select>
+                    <span asp-validation-for="CustomerId" class="text-danger small"></span>
                 }
-            </select>
-            <span asp-validation-for="CustomerId" class="text-danger"></span>
+                else
+                {
+                    var initialMethod = string.Equals(Model.PaymentMethod, "Maya", StringComparison.OrdinalIgnoreCase)
+                        ? "Maya"
+                        : "Cash";
+
+                    <input type="hidden" asp-for="PaymentMethod" id="customerPaymentMethod" value="@initialMethod" />
+
+                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                        <span class="form-label fw-bold mb-0">Payment Method</span>
+                        <span class="small text-muted">Tap to switch</span>
+                    </div>
+
+                    <div class="row g-2 mb-3" role="radiogroup" aria-label="Choose Payment Method">
+                        <div class="col-sm-6">
+                            <button type="button"
+                                    class="qrder-pay-choice @(initialMethod == "Cash" ? "active" : "")"
+                                    data-pay-option="Cash"
+                                    aria-pressed="@(initialMethod == "Cash" ? "true" : "false")">
+                                <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                                    <span class="fw-bold">Cash at Counter</span>
+                                    <span class="badge rounded-pill qrder-pay-selected-pill @(initialMethod == "Cash" ? "" : "d-none")"
+                                          data-pay-badge="Cash">
+                                        Selected
+                                    </span>
+                                </div>
+                                <div class="small text-muted">
+                                    Pay in cash at the Bean Crate counter after submitting.
+                                </div>
+                            </button>
+                        </div>
+
+                        <div class="col-sm-6">
+                            <button type="button"
+                                    class="qrder-pay-choice @(initialMethod == "Maya" ? "active" : "")"
+                                    data-pay-option="Maya"
+                                    aria-pressed="@(initialMethod == "Maya" ? "true" : "false")">
+                                <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                                    <span class="fw-bold">Maya Online Checkout</span>
+                                    <span class="badge rounded-pill qrder-pay-selected-pill @(initialMethod == "Maya" ? "" : "d-none")"
+                                          data-pay-badge="Maya">
+                                        Selected
+                                    </span>
+                                </div>
+                                <div class="small text-muted">
+                                    Pay online via QRPh, Maya Wallet, or Debit/Credit Card.
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="chosenPaymentBanner" class="qrder-callout py-2 px-3 mb-0">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-1">
+                            <span class="small text-muted">Chosen Payment Method:</span>
+                            <span class="fw-bold" id="chosenPaymentTitle">
+                                @(initialMethod == "Maya" ? "Maya Online Checkout" : "Cash at Counter")
+                            </span>
+                        </div>
+                        <div class="small text-muted mt-1" id="chosenPaymentDescription">
+                            @(initialMethod == "Maya"
+                                ? "You will be redirected to Maya Sandbox Checkout right after submitting to complete your payment."
+                                : "Your order will be sent to the counter. Please pay in cash at the register to start preparation.")
+                        </div>
+                    </div>
+
+                    <span asp-validation-for="PaymentMethod" class="text-danger small"></span>
+                }
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h2 class="h5 fw-bold mb-0">Order Items</h2>
+                <button type="button" id="add-item-top" class="btn btn-sm menu-btn px-3 fw-semibold">
+                    + Add Item
+                </button>
+            </div>
+
+            <div id="order-items" class="mb-3"></div>
+
+            @if (!Model.IsStaffOrder)
+            {
+                <div class="qrder-callout mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small text-muted">Estimated Total</span>
+                        <span class="fs-5 fw-bold" id="mobileLiveTotal">₱0.00</span>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit"
+                            id="customerSubmitOrderBtn"
+                            class="btn menu-btn py-2 fw-semibold"
+                            disabled="@(Model.Products.Count == 0)">
+                        Submit Cash Order
+                    </button>
+                    <a asp-controller="Products"
+                       asp-action="Index"
+                       class="btn btn-outline-secondary py-2">
+                        Back to Menu
+                    </a>
+                </div>
+            }
         </div>
-    }
 
-    @if (!Model.IsStaffOrder)
-    {
-        <div class="mb-4">
-            <label asp-for="PaymentMethod" class="form-label">
-                Payment Method
-            </label>
-            <select asp-for="PaymentMethod" class="form-select">
-                <option value="Cash">Cash at counter</option>
-                <option value="PayMongo">Pay online (PayMongo)</option>
-            </select>
-            <span asp-validation-for="PaymentMethod" class="text-danger"></span>
-        </div>
-    }
-
-    @if (Model.Products.Count == 0)
-    {
-        <p class="alert alert-warning">
-            There are currently no available products to order.
-        </p>
-    }
-
-    <h2 class="h4">Order Items</h2>
-
-    <div id="order-items"></div>
-
-    <button type="button" id="add-item" class="btn btn-outline-primary w-100 w-sm-auto mt-2">
-        Add Another Product
-    </button>
-
-    <hr />
-
-    <div class="d-grid gap-2 d-sm-flex">
-        <button type="submit"
-                class="btn btn-primary"
-                disabled="@(Model.Products.Count == 0)">
-            Place Order
-        </button>
-
+        @* Right Sticky Summary Panel (PC Staff Counter Mode) *@
         @if (Model.IsStaffOrder)
         {
-            <a asp-action="Index" class="btn btn-secondary">Cancel</a>
-        }
-        else
-        {
-            <a asp-controller="Products" asp-action="Index"
-               class="btn btn-secondary">Back to Products</a>
+            <div class="col-lg-4">
+                <div class="qrder-card sticky-top" style="top: 1.25rem;">
+                    <div class="qrder-eyebrow">LIVE COUNTER TICKET</div>
+                    <h2 class="h5 fw-bold mb-3">Order Summary</h2>
+
+                    <div id="liveSummaryList" class="small mb-3">
+                        <p class="text-muted mb-0">Select products on the left to build the order.</p>
+                    </div>
+
+                    <div class="border-top pt-3 mb-4">
+                        <div class="d-flex justify-content-between small text-muted mb-1">
+                            <span>Total Items</span>
+                            <span id="liveItemCount">0</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="fw-bold">Estimated Total</span>
+                            <span class="fs-4 fw-bold" id="liveOrderTotal">₱0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit"
+                                class="btn menu-btn py-2 fw-semibold"
+                                disabled="@(Model.Products.Count == 0)">
+                            Submit Counter Order
+                        </button>
+                        <a asp-action="Index" class="btn btn-outline-secondary py-2">
+                            Cancel
+                        </a>
+                    </div>
+                </div>
+            </div>
         }
     </div>
 </form>
 
 <template id="order-item-template">
-    <div class="order-item card mb-3" data-order-row>
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
-                <h3 class="h5 mb-0">Product</h3>
-                <button type="button"
-                        class="btn btn-sm btn-outline-danger remove-item">
-                    Remove
-                </button>
+    <div class="order-item qrder-card mb-3" data-order-row>
+        <div class="d-flex align-items-start gap-3">
+            @* Left Side: Corresponding Product Picture *@
+            <div class="qrder-order-thumb">
+                <img class="item-thumb-img d-none" src="" alt="" />
+                <div class="qrder-order-thumb-fallback item-thumb-fallback">Select Item</div>
             </div>
 
-            <div class="mb-3">
-                <label class="form-label">Choose Product</label>
-                <select class="form-select product-select"
-                        name="Items[__index__].ProductId"
-                        required>
-                    <option value="">Select a product</option>
-                </select>
-            </div>
+            @* Right Side: Header + Read-Only Summary View + Collapsible Editor *@
+            <div class="flex-grow-1 min-w-0">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 pb-2 mb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge rounded-pill"
+                              style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1px solid var(--qrder-border);"
+                              data-row-badge>
+                            Item #1
+                        </span>
+                        <span class="fw-bold text-truncate item-header-name">New Item</span>
+                    </div>
 
-            <div class="mb-3">
-                <label class="form-label">Quantity</label>
-                <input type="number"
-                       class="form-control"
-                       name="Items[__index__].Quantity"
-                       min="1"
-                       max="99"
-                       value="1"
-                       required />
-            </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary toggle-edit-item">
+                            Edit
+                        </button>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-danger remove-item">
+                            Remove
+                        </button>
+                    </div>
+                </div>
 
-            <div class="mb-3">
-                <label class="form-label">Variant (Optional)</label>
-                <select class="form-select variant-select"
-                        name="Items[__index__].VariantOptionId">
-                    <option value="">No variant</option>
-                </select>
-            </div>
+                @* Read-Only Summary View (Default when item is already chosen) *@
+                <div class="item-readonly-summary">
+                    <div class="small text-muted mb-1 item-summary-variant">Variant: Standard</div>
+                    <div class="small text-muted mb-2 item-summary-addons">Add-ons: None</div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small fw-semibold item-summary-qty">Qty: 1</span>
+                        <span class="fw-bold item-summary-subtotal">₱0.00</span>
+                    </div>
+                </div>
 
-            <div class="mb-2">
-                <label class="form-label">Add-ons (Optional)</label>
-                <div class="addons-container">
-                    <span class="text-muted">Choose a product first.</span>
+                @* Editable Controls (Hidden unless "Edit" is clicked or item is brand-new) *@
+                <div class="item-edit-panel d-none pt-1">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label small fw-semibold">Choose Product</label>
+                            <select class="form-select form-select-sm product-select"
+                                    name="Items[__index__].ProductId"
+                                    required>
+                                <option value="">Select a product...</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Quantity</label>
+                            <input type="number"
+                                   class="form-control form-control-sm quantity-input"
+                                   name="Items[__index__].Quantity"
+                                   min="1"
+                                   max="99"
+                                   value="1"
+                                   required />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Variant (Optional)</label>
+                            <select class="form-select form-select-sm variant-select"
+                                    name="Items[__index__].VariantOptionId">
+                                <option value="">No variant</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Add-ons (Cheapest First)</label>
+                            <div class="addons-container small">
+                                <span class="text-muted">Choose a product first.</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -146,12 +389,34 @@ else
 
     <script>
         const products = @Html.Raw(JsonSerializer.Serialize(Model.Products));
+        const productMeta = @Html.Raw(JsonSerializer.Serialize(productMeta));
         const savedItems = @Html.Raw(JsonSerializer.Serialize(savedItems));
 
         const container = document.getElementById("order-items");
         const template = document.getElementById("order-item-template");
 
+        const liveSummaryList = document.getElementById("liveSummaryList");
+        const liveItemCount = document.getElementById("liveItemCount");
+        const liveOrderTotal = document.getElementById("liveOrderTotal");
+        const mobileLiveTotal = document.getElementById("mobileLiveTotal");
+
         let nextIndex = 0;
+
+        function toProductSlug(name) {
+            return String(name || "")
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-+|-+$/g, "");
+        }
+
+        function resolveProductImage(product) {
+            if (!product) return "";
+            const meta = productMeta[String(product.Id)] || productMeta[product.Id];
+            if (meta && meta.ImageUrl) {
+                return meta.ImageUrl;
+            }
+            return "/images/products/" + toProductSlug(product.Name) + ".png";
+        }
 
         function formatAdjustment(value) {
             const amount = Number(value);
@@ -165,6 +430,191 @@ else
             option.textContent = name + " (" + formatAdjustment(adjustment) + ")";
             option.selected = selected;
             select.appendChild(option);
+        }
+
+        function setRowEditMode(row, isEditing) {
+            const readonlyBox = row.querySelector(".item-readonly-summary");
+            const editPanel = row.querySelector(".item-edit-panel");
+            const toggleBtn = row.querySelector(".toggle-edit-item");
+
+            row.dataset.editing = isEditing ? "true" : "false";
+            readonlyBox?.classList.toggle("d-none", isEditing);
+            editPanel?.classList.toggle("d-none", !isEditing);
+
+            if (toggleBtn) {
+                toggleBtn.textContent = isEditing ? "Done" : "Edit";
+                toggleBtn.classList.toggle("menu-btn", isEditing);
+                toggleBtn.classList.toggle("btn-outline-secondary", !isEditing);
+            }
+        }
+
+        function updateRowDisplay(row, idx) {
+            const badgeEl = row.querySelector("[data-row-badge]");
+            if (badgeEl) {
+                badgeEl.textContent = "Item #" + (idx + 1);
+            }
+
+            const productId = Number(row.querySelector(".product-select")?.value || 0);
+            const product = products.find(p => p.Id === productId);
+
+            const headerNameEl = row.querySelector(".item-header-name");
+            const thumbImg = row.querySelector(".item-thumb-img");
+            const thumbFallback = row.querySelector(".item-thumb-fallback");
+            const summaryVariantEl = row.querySelector(".item-summary-variant");
+            const summaryAddonsEl = row.querySelector(".item-summary-addons");
+            const summaryQtyEl = row.querySelector(".item-summary-qty");
+            const summarySubtotalEl = row.querySelector(".item-summary-subtotal");
+
+            if (!product) {
+                if (headerNameEl) headerNameEl.textContent = "Choose a Product";
+                if (thumbFallback) {
+                    thumbFallback.textContent = "No Item";
+                    thumbFallback.classList.remove("d-none");
+                }
+                if (thumbImg) thumbImg.classList.add("d-none");
+                if (summaryVariantEl) summaryVariantEl.textContent = "Variant: —";
+                if (summaryAddonsEl) summaryAddonsEl.textContent = "Add-ons: —";
+                if (summaryQtyEl) summaryQtyEl.textContent = "Qty: 1";
+                if (summarySubtotalEl) summarySubtotalEl.textContent = "₱0.00";
+                return null;
+            }
+
+            if (headerNameEl) {
+                headerNameEl.textContent = product.Name;
+            }
+
+            // Update left-side product thumbnail
+            const imgUrl = resolveProductImage(product);
+            if (thumbFallback) {
+                thumbFallback.textContent = product.Name;
+            }
+            if (thumbImg && thumbFallback) {
+                if (thumbImg.getAttribute("data-loaded-src") !== imgUrl) {
+                    thumbImg.setAttribute("data-loaded-src", imgUrl);
+                    thumbImg.alt = product.Name;
+                    thumbImg.onload = () => {
+                        thumbImg.classList.remove("d-none");
+                        thumbFallback.classList.add("d-none");
+                    };
+                    thumbImg.onerror = () => {
+                        thumbImg.classList.add("d-none");
+                        thumbFallback.classList.remove("d-none");
+                    };
+                    thumbImg.src = imgUrl;
+                }
+            }
+
+            const qtyInput = row.querySelector(".quantity-input");
+            const qty = Math.max(1, Math.min(99, Number(qtyInput?.value || 1)));
+
+            let unitPrice = Number(product.BasePrice || 0);
+            let variantLabel = "Standard";
+            const optionNames = [];
+
+            const variantId = Number(row.querySelector(".variant-select")?.value || 0);
+            if (variantId > 0) {
+                const variant = (product.Variants || []).find(v => v.Id === variantId);
+                if (variant) {
+                    unitPrice += Number(variant.PriceAdjustment || 0);
+                    variantLabel = variant.Name + " (" + formatAdjustment(variant.PriceAdjustment) + ")";
+                    optionNames.push(variant.Name);
+                }
+            }
+
+            const addOnLabels = [];
+            row.querySelectorAll(".addons-container input[type='checkbox']:checked").forEach(cb => {
+                const addOnId = Number(cb.value);
+                const addOn = (product.AddOns || []).find(a => a.Id === addOnId);
+                if (addOn) {
+                    unitPrice += Number(addOn.PriceAdjustment || 0);
+                    addOnLabels.push(addOn.Name + " (" + formatAdjustment(addOn.PriceAdjustment) + ")");
+                    optionNames.push(addOn.Name);
+                }
+            });
+
+            const lineTotal = unitPrice * qty;
+
+            if (summaryVariantEl) {
+                summaryVariantEl.textContent = "Variant: " + variantLabel;
+            }
+            if (summaryAddonsEl) {
+                summaryAddonsEl.textContent = "Add-ons: " + (addOnLabels.length > 0 ? addOnLabels.join(", ") : "None");
+            }
+            if (summaryQtyEl) {
+                summaryQtyEl.textContent = "Qty: " + qty;
+            }
+            if (summarySubtotalEl) {
+                summarySubtotalEl.textContent = "₱" + lineTotal.toFixed(2);
+            }
+
+            return { product, qty, lineTotal, optionNames };
+        }
+
+        function updateOrderSummary() {
+            const rows = container.querySelectorAll("[data-order-row]");
+            let totalAmount = 0;
+            let totalQty = 0;
+            const summaryFragments = [];
+
+            rows.forEach((row, idx) => {
+                const parsed = updateRowDisplay(row, idx);
+                if (!parsed) {
+                    return;
+                }
+
+                totalAmount += parsed.lineTotal;
+                totalQty += parsed.qty;
+
+                const lineDiv = document.createElement("div");
+                lineDiv.className = "mb-2 pb-2 border-bottom";
+
+                const topRow = document.createElement("div");
+                topRow.className = "d-flex justify-content-between fw-semibold";
+
+                const nameSpan = document.createElement("span");
+                nameSpan.textContent = parsed.qty + " x " + parsed.product.Name;
+
+                const priceSpan = document.createElement("span");
+                priceSpan.textContent = "₱" + parsed.lineTotal.toFixed(2);
+
+                topRow.append(nameSpan, priceSpan);
+                lineDiv.appendChild(topRow);
+
+                if (parsed.optionNames.length > 0) {
+                    const optDiv = document.createElement("div");
+                    optDiv.className = "text-muted";
+                    optDiv.textContent = parsed.optionNames.join(", ");
+                    lineDiv.appendChild(optDiv);
+                }
+
+                summaryFragments.push(lineDiv);
+            });
+
+            const formattedTotal = "₱" + totalAmount.toFixed(2);
+
+            if (liveSummaryList) {
+                liveSummaryList.replaceChildren();
+                if (summaryFragments.length === 0) {
+                    const emptyP = document.createElement("p");
+                    emptyP.className = "text-muted mb-0";
+                    emptyP.textContent = "Select products on the left to build the order.";
+                    liveSummaryList.appendChild(emptyP);
+                } else {
+                    summaryFragments.forEach(frag => liveSummaryList.appendChild(frag));
+                }
+            }
+
+            if (liveItemCount) {
+                liveItemCount.textContent = String(totalQty);
+            }
+
+            if (liveOrderTotal) {
+                liveOrderTotal.textContent = formattedTotal;
+            }
+
+            if (mobileLiveTotal) {
+                mobileLiveTotal.textContent = formattedTotal;
+            }
         }
 
         function populateOptions(row, selectedVariant, selectedAddOns) {
@@ -202,7 +652,13 @@ else
                 return;
             }
 
-            (product.AddOns || []).forEach(addOn => {
+            // Sort add-ons cheapest first, then by name
+            const sortedAddOns = [...product.AddOns].sort((a, b) =>
+                (Number(a.PriceAdjustment) - Number(b.PriceAdjustment)) ||
+                String(a.Name).localeCompare(String(b.Name))
+            );
+
+            sortedAddOns.forEach(addOn => {
                 const wrapper = document.createElement("div");
                 wrapper.className = "form-check";
 
@@ -213,6 +669,7 @@ else
                 input.value = String(addOn.Id);
                 input.id = "addon-" + row.dataset.index + "-" + addOn.Id;
                 input.checked = selectedAddOns.includes(addOn.Id);
+                input.addEventListener("change", updateOrderSummary);
 
                 const label = document.createElement("label");
                 label.className = "form-check-label";
@@ -250,9 +707,10 @@ else
             });
 
             nextIndex = rows.length;
+            updateOrderSummary();
         }
 
-        function addRow(saved = {}) {
+        function addRow(saved = {}, startInEditMode = false) {
             const fragment = template.content.cloneNode(true);
             const row = fragment.querySelector("[data-order-row]");
             const index = nextIndex++;
@@ -264,6 +722,9 @@ else
             });
 
             const productSelect = row.querySelector(".product-select");
+            const quantityInput = row.querySelector(".quantity-input");
+            const variantSelect = row.querySelector(".variant-select");
+            const toggleEditBtn = row.querySelector(".toggle-edit-item");
 
             products.forEach(product => {
                 const option = document.createElement("option");
@@ -277,8 +738,7 @@ else
                 ? String(saved.ProductId)
                 : "";
 
-            row.querySelector('input[type="number"]').value =
-                saved.Quantity || 1;
+            quantityInput.value = saved.Quantity || 1;
 
             populateOptions(
                 row,
@@ -286,9 +746,31 @@ else
                 (saved.AddOnOptionIds || []).map(Number)
             );
 
+            // Pre-selected items start locked (uneditable); brand-new rows start in edit mode
+            const shouldEdit = startInEditMode || !saved.ProductId;
+            setRowEditMode(row, shouldEdit);
+
+            toggleEditBtn?.addEventListener("click", () => {
+                const currentlyEditing = row.dataset.editing === "true";
+                if (currentlyEditing) {
+                    if (!productSelect.value) {
+                        productSelect.focus();
+                        return;
+                    }
+                    setRowEditMode(row, false);
+                } else {
+                    setRowEditMode(row, true);
+                }
+                updateOrderSummary();
+            });
+
             productSelect.addEventListener("change", () => {
                 populateOptions(row, null, []);
+                updateOrderSummary();
             });
+
+            quantityInput.addEventListener("input", updateOrderSummary);
+            variantSelect.addEventListener("change", updateOrderSummary);
 
             row.querySelector(".remove-item").addEventListener("click", () => {
                 row.remove();
@@ -296,16 +778,91 @@ else
             });
 
             container.appendChild(row);
+            updateOrderSummary();
         }
 
-        document.getElementById("add-item").addEventListener("click", () => {
-            addRow();
+        document.getElementById("add-item-top")?.addEventListener("click", () => addRow({}, true));
+
+        // Visual Payment Method selector & Chosen Payment banner sync
+        const paymentHiddenInput = document.getElementById("customerPaymentMethod");
+        const paymentChoiceBtns = document.querySelectorAll("[data-pay-option]");
+        const chosenPaymentTitle = document.getElementById("chosenPaymentTitle");
+        const chosenPaymentDesc = document.getElementById("chosenPaymentDescription");
+        const submitBtn = document.getElementById("customerSubmitOrderBtn");
+
+        function selectPaymentMethod(method) {
+            if (!paymentHiddenInput) return;
+            const normalized = method === "Maya" ? "Maya" : "Cash";
+            paymentHiddenInput.value = normalized;
+
+            paymentChoiceBtns.forEach(btn => {
+                const isSelected = btn.getAttribute("data-pay-option") === normalized;
+                btn.classList.toggle("active", isSelected);
+                btn.setAttribute("aria-pressed", isSelected ? "true" : "false");
+            });
+
+            document.querySelectorAll("[data-pay-badge]").forEach(badge => {
+                const isSelected = badge.getAttribute("data-pay-badge") === normalized;
+                badge.classList.toggle("d-none", !isSelected);
+            });
+
+            if (chosenPaymentTitle) {
+                chosenPaymentTitle.textContent = normalized === "Maya"
+                    ? "Maya Online Checkout"
+                    : "Cash at Counter";
+            }
+
+            if (chosenPaymentDesc) {
+                chosenPaymentDesc.textContent = normalized === "Maya"
+                    ? "You will be redirected to Maya Sandbox Checkout right after submitting to complete your payment."
+                    : "Your order will be sent to the counter. Please pay in cash at the register to start preparation.";
+            }
+
+            if (submitBtn) {
+                submitBtn.textContent = normalized === "Maya"
+                    ? "Submit & Pay with Maya"
+                    : "Submit Cash Order";
+            }
+        }
+
+        paymentChoiceBtns.forEach(btn => {
+            btn.addEventListener("click", () => {
+                selectPaymentMethod(btn.getAttribute("data-pay-option"));
+            });
         });
 
-        if (savedItems.length > 0) {
-            savedItems.forEach(item => addRow(item));
-        } else {
-            addRow();
+        if (paymentHiddenInput) {
+            selectPaymentMethod(paymentHiddenInput.value);
         }
+
+        const isStaffOrder = @(Model.IsStaffOrder ? "true" : "false");
+        const cartStorageKey = "qrder_customer_cart";
+        const hasServerItems = savedItems.length > 0 && savedItems.some(i => Number(i.ProductId) > 0);
+
+        if (hasServerItems) {
+            savedItems.forEach(item => addRow(item, false));
+        } else if (!isStaffOrder) {
+            let cartItems = [];
+            try {
+                const raw = sessionStorage.getItem(cartStorageKey);
+                cartItems = raw ? JSON.parse(raw) : [];
+            } catch {
+                cartItems = [];
+            }
+
+            if (Array.isArray(cartItems) && cartItems.length > 0) {
+                cartItems.forEach(item => addRow(item, false));
+            } else {
+                addRow({}, true);
+            }
+        } else {
+            addRow({}, true);
+        }
+
+        document.getElementById("qrderOrderForm")?.addEventListener("submit", () => {
+            if (!isStaffOrder) {
+                sessionStorage.removeItem(cartStorageKey);
+            }
+        });
     </script>
 }

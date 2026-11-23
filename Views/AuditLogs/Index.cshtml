@@ -1,0 +1,83 @@
+@*
+    Views/AuditLogs/Index.cshtml
+    Owner-only Audit Trail screen for QRDER (Bean Crate Cafe).
+*@
+@model IEnumerable<orderManagementSystem.Models.AuditLog>
+
+@{
+    ViewData["Title"] = "Audit Trail";
+    var manilaTz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+    var migrationPending = ViewBag.MigrationPending is bool pending && pending;
+    var logsList = Model.ToList();
+}
+
+<div class="mb-4">
+    <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; OWNER GOVERNANCE</div>
+    <h1 class="qrder-page-title">Audit Trail</h1>
+    <p class="qrder-page-subtitle mb-0">
+        Chronological record of system activity, report exports, and administrative actions for Bean Crate Cafe.
+    </p>
+</div>
+
+@if (migrationPending)
+{
+    <div class="alert alert-warning mb-4">
+        <strong>Database migration pending:</strong> Run
+        <code>dotnet ef migrations add AddAuditLogs &amp;&amp; dotnet ef database update</code>
+        in your terminal to activate the <code>AuditLogs</code> table.
+    </div>
+}
+
+<div class="qrder-card">
+    @if (!logsList.Any())
+    {
+        <div class="text-center py-5">
+            <h2 class="h5 fw-bold mb-1">No audit entries recorded yet</h2>
+            <p class="text-muted small mb-0">
+                Actions such as exporting sales reports or updating system records will appear here automatically.
+            </p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle stack-table mb-0">
+                <thead>
+                    <tr>
+                        <th>Timestamp (PHT)</th>
+                        <th>Actor</th>
+                        <th>Role</th>
+                        <th>Action</th>
+                        <th>Target</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var log in logsList)
+                    {
+                        var localDt = TimeZoneInfo.ConvertTimeFromUtc(
+                            DateTime.SpecifyKind(log.TimestampUtc, DateTimeKind.Utc),
+                            manilaTz
+                        );
+                        <tr>
+                            <td data-label="Timestamp (PHT)" class="small">
+                                @localDt.ToString("MMM dd, yyyy hh:mm:ss tt")
+                            </td>
+                            <td data-label="Actor" class="fw-semibold">@log.ActorName</td>
+                            <td data-label="Role">
+                                <span class="badge rounded-pill" style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1px solid var(--qrder-border);">
+                                    @log.ActorRole
+                                </span>
+                            </td>
+                            <td data-label="Action" class="fw-semibold">@log.ActionType</td>
+                            <td data-label="Target" class="small">
+                                @log.EntityName @(string.IsNullOrWhiteSpace(log.EntityId) ? "" : $"#{log.EntityId}")
+                            </td>
+                            <td data-label="Details" class="small text-muted">@log.Details</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

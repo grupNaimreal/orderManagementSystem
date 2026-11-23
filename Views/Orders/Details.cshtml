@@ -1,210 +1,410 @@
+@*
+    Views/Orders/Details.cshtml
+    Order Details & Printable Order Slip for QRDER (Bean Crate Cafe):
+    - Supports Cash, Maya Checkout Sandbox (Option 5B), and PayMongo payment flows.
+    - Provides customers with a Maya Checkout resume/retry button and Sandbox test card/wallet credentials.
+    - Provides staff with live Maya status verification, manual payment confirmation, and a printable slip.
+*@
 @model orderManagementSystem.Models.Order
 
 @{
-    ViewData["Title"] = "Order Details";
+    ViewData["Title"] = $"Order #{Model.Id}";
     var isStaff = User.IsInRole("Owner") || User.IsInRole("Employee");
+    var manilaTz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+    var localOrderDate = TimeZoneInfo.ConvertTimeFromUtc(
+        DateTime.SpecifyKind(Model.OrderDate, DateTimeKind.Utc),
+        manilaTz
+    );
+
+    DateTime? localPaidDate = Model.PaymentPaidAtUtc.HasValue
+        ? TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.SpecifyKind(Model.PaymentPaidAtUtc.Value, DateTimeKind.Utc),
+            manilaTz)
+        : null;
 }
 
-<h1>Order #@Model.Id</h1>
+<style>
+    .qrder-receipt-slip {
+        background-color: var(--qrder-surface);
+        border: 1px dashed var(--qrder-border);
+        border-radius: 16px;
+        padding: 1.35rem;
+    }
 
-<div class="card mb-4">
-    <div class="card-body">
-        <dl class="row mb-0">
-            <dt class="col-sm-3">Customer</dt>
-            <dd class="col-sm-9">@Model.CustomerName</dd>
+    @@media print {
+        body * {
+            visibility: hidden !important;
+        }
 
-            <dt class="col-sm-3">Order Date</dt>
-            <dd class="col-sm-9">@TimeZoneInfo.ConvertTimeFromUtc(
-                DateTime.SpecifyKind(Model.OrderDate, DateTimeKind.Utc),
-                TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila")
-            ).ToString("MMM dd, yyyy hh:mm tt")</dd>
+        #printableReceipt,
+        #printableReceipt * {
+            visibility: visible !important;
+        }
 
-            <dt class="col-sm-3">Status</dt>
-            <dd class="col-sm-9">
-                <span class="badge bg-primary">@Model.Status</span>
-            </dd>
+        #printableReceipt {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            max-width: 360px;
+            background: #ffffff !important;
+            color: #000000 !important;
+            border: none !important;
+            padding: 12px !important;
+            box-shadow: none !important;
+        }
 
-            <dt class="col-sm-3">Payment Method</dt>
-            <dd class="col-sm-9">@Model.PaymentMethod</dd>
+        .no-print {
+            display: none !important;
+        }
+    }
+</style>
 
-            <dt class="col-sm-3">Payment Status</dt>
-            <dd class="col-sm-9">
-                <span class="badge bg-secondary">@Model.PaymentStatus</span>
-            </dd>
-        </dl>
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-4 no-print">
+    <div>
+        <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; ORDER RECORD</div>
+        <h1 class="qrder-page-title mb-0">Order #@Model.Id</h1>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+        @if (isStaff)
+        {
+            <button type="button" onclick="window.print()" class="btn btn-outline-secondary px-3">
+                Print Order Slip
+            </button>
+            <a asp-action="Index" class="btn btn-outline-secondary px-3">
+                Back to Order Board
+            </a>
+        }
+        else
+        {
+            <a asp-action="MyOrders" class="btn btn-outline-secondary px-3">
+                Back to My Orders
+            </a>
+        }
     </div>
 </div>
 
 @if (TempData["PaymentError"] is string paymentError)
 {
-    <div class="alert alert-warning">@paymentError</div>
+    <div class="alert alert-warning no-print">@paymentError</div>
 }
 
-@if (TempData["PaymentNotice"] is string paymentNotice) { <div class="alert alert-info">@paymentNotice</div> }
-
-@if (isStaff
-    && Model.PaymentMethod == "Cash"
-    && Model.PaymentStatus == "Pending"
-    && Model.Status == "Pending")
+@if (TempData["PaymentNotice"] is string paymentNotice)
 {
-    <form asp-action="MarkCashPaid" method="post" class="mb-4">
-        <input type="hidden" name="id" value="@Model.Id" />
-        <button type="submit" class="btn btn-success w-100 w-sm-auto">
-            Confirm Cash Received
-        </button>
-    </form>
+    <div class="alert alert-info no-print">@paymentNotice</div>
 }
 
-@if (!isStaff
-    && Model.PaymentMethod == "PayMongo"
-    && Model.PaymentStatus == "Pending")
-{
-    <div class="alert alert-info mb-4">
-        <strong>Payment is not confirmed yet.</strong>
-        Complete checkout and wait for payment verification.
-        @if (!string.IsNullOrWhiteSpace(Model.PayMongoCheckoutUrl))
-        {
-            <div class="mt-2">
-                <a href="@Model.PayMongoCheckoutUrl"
-                   class="btn btn-primary w-100 w-sm-auto">
-                    Continue PayMongo Checkout
-                </a>
+<div class="row g-4">
+    @* Left / Primary Column: Order Metadata & Line Items *@
+    <div class="@(isStaff ? "col-lg-8" : "col-12") no-print">
+        <div class="qrder-card mb-4">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pb-3 mb-3 border-bottom">
+                <div>
+                    <div class="small text-muted">Customer / Table Session</div>
+                    <div class="fs-5 fw-bold">@Model.CustomerName</div>
+                </div>
+                <div class="text-md-end">
+                    <div class="small text-muted">Placed (PHT)</div>
+                    <div class="fw-semibold">@localOrderDate.ToString("MMM dd, yyyy hh:mm tt")</div>
+                </div>
             </div>
-        }
-        else
-        {
-            <form asp-action="StartPayMongoCheckout"
-                  asp-route-id="@Model.Id"
-                  method="post"
-                  class="mt-2">
-                <button type="submit" class="btn btn-primary w-100 w-sm-auto">
-                    Retry Online Checkout
-                </button>
-            </form>
-        }
-    </div>
-}
 
-<h2 class="h4">Order Items</h2>
+            <div class="row g-3">
+                <div class="col-sm-4">
+                    <div class="qrder-callout">
+                        <div class="small text-muted">Order Status</div>
+                        <div class="fw-bold mt-1">@Model.Status</div>
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="qrder-callout">
+                        <div class="small text-muted">Payment Method</div>
+                        <div class="fw-bold mt-1">@Model.PaymentMethod</div>
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="qrder-callout">
+                        <div class="small text-muted">Payment Status</div>
+                        <div class="fw-bold mt-1">@Model.PaymentStatus</div>
+                    </div>
+                </div>
+            </div>
 
-@if (Model.Items.Any())
-{
-    <div class="table-responsive">
-        <table class="table table-striped stack-table">
-            <thead>
-                <tr>
-                    <th>Product</th>
-                    <th>Base Price</th>
-                    <th>Selected Options</th>
-                    <th>Quantity</th>
-                    <th>Unit Price</th>
-                    <th>Subtotal</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var item in Model.Items)
-                {
-                    <tr>
-                        <td data-label="Product">@item.ProductNameSnapshot</td>
-                        <td data-label="Base Price">₱@item.BaseUnitPrice.ToString("N2")</td>
-                        <td data-label="Selected Options">
-                            @if (item.SelectedOptions.Any())
-                            {
-                                <ul class="mb-0 ps-3">
-                                    @foreach (var option in item.SelectedOptions)
-                                    {
-                                        <li>
-                                            @option.NameSnapshot
-                                            (@option.OptionType):
-                                            ₱@option.PriceAdjustment.ToString("N2")
-                                        </li>
-                                    }
-                                </ul>
-                            }
-                            else
-                            {
-                                <span class="text-muted">None</span>
-                            }
-                        </td>
-                        <td data-label="Quantity">@item.Quantity</td>
-                        <td data-label="Unit Price">₱@item.UnitPrice.ToString("N2")</td>
-                        <td data-label="Subtotal">₱@item.LineTotal.ToString("N2")</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-}
-else
-{
-    <p class="text-muted">No order items were recorded.</p>
-}
-
-<div class="text-md-end mb-4">
-    <h3>Total: ₱@Model.TotalAmount.ToString("N2")</h3>
-</div>
-
-@if (isStaff)
-{
-    <div class="card mb-4">
-        <div class="card-body">
-            <h2 class="h5">Manage Order Status</h2>
-
-            @if (Model.Status == "Pending" || Model.Status == "Preparing")
+            @if (!isStaff
+                && Model.PaymentMethod == "Maya"
+                && Model.PaymentStatus == "Pending"
+                && Model.Status == "Pending")
             {
-                <form asp-action="UpdateStatus" method="post">
-                    <input type="hidden" name="id" value="@Model.Id" />
+                <div class="alert alert-info mt-4 mb-0">
+                    <div class="fw-bold mb-1">Complete Your Maya Checkout Payment</div>
+                    <p class="small mb-3">
+                        Click below to open Maya Sandbox Checkout and complete payment within 10 minutes of placing your order.
+                    </p>
 
-                    <div class="mb-3">
-                        <label for="status" class="form-label">
-                            New Status
-                        </label>
-
-                        <select id="status" name="status" class="form-select">
-                            @if (Model.Status == "Pending")
-                            {
-                                @if (Model.PaymentStatus == "Paid" || Model.PaymentStatus == "NotTracked")
-                                {
-                                    <option value="Preparing">Preparing</option>
-                                }
-                                <option value="Cancelled">Cancelled</option>
-                            }
-                            else
-                            {
-                                <option value="Completed">Completed</option>
-                                <option value="Cancelled">Cancelled</option>
-                            }
-                        </select>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        @if (!string.IsNullOrWhiteSpace(Model.PayMongoCheckoutUrl))
+                        {
+                            <a href="@Model.PayMongoCheckoutUrl" class="btn menu-btn fw-semibold">
+                                Open Maya Checkout &rarr;
+                            </a>
+                        }
+                        <form asp-action="StartMayaCheckout" asp-route-id="@Model.Id" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-outline-secondary">
+                                Generate New Maya Session
+                            </button>
+                        </form>
                     </div>
 
-                    <button type="submit" class="btn btn-primary w-100 w-sm-auto">
-                        Update Status
-                    </button>
-                </form>
+                    <details class="small border-top pt-2">
+                        <summary class="fw-semibold" style="cursor: pointer;">
+                            Maya Sandbox Test Credentials (For Demo / Grading)
+                        </summary>
+                        <div class="pt-2">
+                            <div><strong>Test Mastercard (No 3DS):</strong> <code>5123456789012346</code> &middot; Expiry <code>12/2030</code> &middot; CVV <code>111</code></div>
+                            <div><strong>Test Visa Card:</strong> <code>4123450131001381</code> &middot; Expiry <code>12/2030</code> &middot; CVV <code>123</code> &middot; 3DS Password <code>mctest1</code></div>
+                            <div><strong>Test Maya Wallet:</strong> <code>+639900100900</code> &middot; Password <code>Password@1</code> &middot; OTP <code>123456</code></div>
+                        </div>
+                    </details>
+                </div>
+            }
+
+            @if (!isStaff
+                && Model.PaymentMethod == "PayMongo"
+                && Model.PaymentStatus == "Pending")
+            {
+                <div class="alert alert-info mt-4 mb-0">
+                    <strong>Payment is not confirmed yet.</strong>
+                    Complete checkout and wait for payment verification.
+                    @if (!string.IsNullOrWhiteSpace(Model.PayMongoCheckoutUrl))
+                    {
+                        <div class="mt-2">
+                            <a href="@Model.PayMongoCheckoutUrl"
+                               class="btn menu-btn w-100 w-sm-auto">
+                                Continue PayMongo Checkout
+                            </a>
+                        </div>
+                    }
+                    else
+                    {
+                        <form asp-action="StartPayMongoCheckout"
+                              asp-route-id="@Model.Id"
+                              method="post"
+                              class="mt-2">
+                            <button type="submit" class="btn menu-btn w-100 w-sm-auto">
+                                Retry Online Checkout
+                            </button>
+                        </form>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="qrder-card">
+            <h2 class="h5 fw-bold mb-3">Ordered Items</h2>
+
+            @if (Model.Items.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle stack-table mb-3">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Base Price</th>
+                                <th>Selected Options</th>
+                                <th>Qty</th>
+                                <th>Unit Price</th>
+                                <th class="text-end">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.Items)
+                            {
+                                <tr>
+                                    <td data-label="Product" class="fw-semibold">@item.ProductNameSnapshot</td>
+                                    <td data-label="Base Price">₱@item.BaseUnitPrice.ToString("N2")</td>
+                                    <td data-label="Selected Options">
+                                        @if (item.SelectedOptions.Any())
+                                        {
+                                            <ul class="mb-0 ps-3 small">
+                                                @foreach (var option in item.SelectedOptions)
+                                                {
+                                                    <li>
+                                                        @option.NameSnapshot (@option.OptionType):
+                                                        +₱@option.PriceAdjustment.ToString("N2")
+                                                    </li>
+                                                }
+                                            </ul>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">None</span>
+                                        }
+                                    </td>
+                                    <td data-label="Qty">@item.Quantity</td>
+                                    <td data-label="Unit Price">₱@item.UnitPrice.ToString("N2")</td>
+                                    <td data-label="Subtotal" class="text-end fw-semibold">₱@item.LineTotal.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             }
             else
             {
-                <p class="text-muted mb-0">
-                    This order has reached a final status.
-                </p>
+                <p class="text-muted">No order items were recorded.</p>
             }
 
-            @if (TempData["OrderError"] != null)
-            {
-                <p class="text-danger mt-3 mb-0">
-                    @TempData["OrderError"]
-                </p>
-            }
+            <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                <span class="text-muted">Total Amount</span>
+                <span class="fs-4 fw-bold">₱@Model.TotalAmount.ToString("N2")</span>
+            </div>
         </div>
     </div>
 
-    <a asp-action="Index" class="btn btn-secondary w-100 w-sm-auto">
-        Back to Orders
-    </a>
-}
-else
-{
-    <a asp-action="MyOrders" class="btn btn-secondary w-100 w-sm-auto">
-        Back to My Orders
-    </a>
-}
+    @* Right Column (PC Staff/Owner): Payment & Status Controls + Printable Order Slip *@
+    @if (isStaff)
+    {
+        <div class="col-lg-4">
+            <div class="qrder-card mb-4 no-print">
+                <h2 class="h5 fw-bold mb-3">Counter Actions</h2>
+
+                @if (Model.PaymentMethod == "Cash"
+                    && Model.PaymentStatus == "Pending"
+                    && Model.Status == "Pending")
+                {
+                    <div class="qrder-callout mb-3">
+                        <div class="small fw-semibold mb-2">Cash Payment Pending</div>
+                        <form asp-action="MarkCashPaid" method="post">
+                            <input type="hidden" name="id" value="@Model.Id" />
+                            <button type="submit" class="btn btn-success w-100 fw-semibold">
+                                Confirm Cash Received (₱@Model.TotalAmount.ToString("N2"))
+                            </button>
+                        </form>
+                    </div>
+                }
+
+                @if (Model.PaymentMethod == "Maya"
+                    && Model.PaymentStatus == "Pending"
+                    && Model.Status == "Pending")
+                {
+                    <div class="qrder-callout mb-3">
+                        <div class="small fw-semibold mb-2">Maya Online Payment Pending</div>
+                        <div class="d-grid gap-2">
+                            <form asp-action="VerifyMayaPayment" method="post">
+                                <input type="hidden" name="id" value="@Model.Id" />
+                                <button type="submit" class="btn menu-btn w-100 fw-semibold">
+                                    Verify Status with Maya
+                                </button>
+                            </form>
+                            <form asp-action="MarkMayaPaid" method="post">
+                                <input type="hidden" name="id" value="@Model.Id" />
+                                <button type="submit" class="btn btn-outline-success btn-sm w-100">
+                                    Confirm Maya / QRPh Manually
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                }
+
+                @if (Model.Status == "Pending" || Model.Status == "Preparing")
+                {
+                    <form asp-action="UpdateStatus" method="post">
+                        <input type="hidden" name="id" value="@Model.Id" />
+
+                        <div class="mb-3">
+                            <label for="status" class="form-label small fw-semibold">
+                                Update Order Status
+                            </label>
+
+                            <select id="status" name="status" class="form-select">
+                                @if (Model.Status == "Pending")
+                                {
+                                    @if (Model.PaymentStatus == "Paid" || Model.PaymentStatus == "NotTracked")
+                                    {
+                                        <option value="Preparing">Preparing (Send to Barista / Kitchen)</option>
+                                    }
+                                    <option value="Cancelled">Cancelled</option>
+                                }
+                                else
+                                {
+                                    <option value="Completed">Completed (Served)</option>
+                                    <option value="Cancelled">Cancelled</option>
+                                }
+                            </select>
+                        </div>
+
+                        <button type="submit" class="btn menu-btn w-100 fw-semibold">
+                            Update Status
+                        </button>
+                    </form>
+                }
+                else
+                {
+                    <p class="text-muted small mb-0">
+                        This order has reached a final status (@Model.Status).
+                    </p>
+                }
+
+                @if (TempData["OrderError"] != null)
+                {
+                    <p class="text-danger small mt-3 mb-0">
+                        @TempData["OrderError"]
+                    </p>
+                }
+            </div>
+
+            @* Printable Digital Order Slip (Replaces Handwritten Lista) *@
+            <div id="printableReceipt" class="qrder-receipt-slip">
+                <div class="text-center pb-3 mb-3 border-bottom">
+                    <div class="fw-bold fs-5">Bean Crate Cafe</div>
+                    <div class="small text-muted">Antipolo City &middot; Powered by <span class="qrder-wordmark-inline">QRDER</span></div>
+                    <div class="small text-muted mt-1">ORDER SLIP #@Model.Id</div>
+                </div>
+
+                <div class="small mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Customer:</span>
+                        <span class="fw-semibold">@Model.CustomerName</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Date:</span>
+                        <span>@localOrderDate.ToString("MMM dd, yyyy hh:mm tt")</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Payment:</span>
+                        <span>@Model.PaymentMethod (@Model.PaymentStatus)</span>
+                    </div>
+                    @if (localPaidDate.HasValue)
+                    {
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Paid At:</span>
+                            <span>@localPaidDate.Value.ToString("hh:mm tt")</span>
+                        </div>
+                    }
+                </div>
+
+                <div class="border-top border-bottom py-2 mb-3 small">
+                    @foreach (var item in Model.Items)
+                    {
+                        <div class="d-flex justify-content-between fw-semibold">
+                            <span>@item.Quantity x @item.ProductNameSnapshot</span>
+                            <span>₱@item.LineTotal.ToString("N2")</span>
+                        </div>
+                        @if (item.SelectedOptions.Any())
+                        {
+                            <div class="text-muted ps-3 mb-1">
+                                @string.Join(", ", item.SelectedOptions.Select(o => o.NameSnapshot))
+                            </div>
+                        }
+                    }
+                </div>
+
+                <div class="d-flex justify-content-between fw-bold fs-6">
+                    <span>TOTAL</span>
+                    <span>₱@Model.TotalAmount.ToString("N2")</span>
+                </div>
+            </div>
+        </div>
+    }
+</div>

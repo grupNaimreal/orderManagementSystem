@@ -65,27 +65,75 @@ public class CustomersController : Controller
     [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create([Bind("DisplayName")] Customer customer)
+    public async Task<IActionResult> Create(
+        [Bind("DisplayName")] Customer customer,
+        string? tableLabel = null,
+        string? returnTo = null)
     {
-        customer.DisplayName = (customer.DisplayName ?? string.Empty).Trim();
+        var isHomeSource = string.Equals(returnTo, "home", StringComparison.OrdinalIgnoreCase);
+        var cleanName = (customer.DisplayName ?? string.Empty).Trim();
+        var cleanTable = (tableLabel ?? string.Empty).Trim();
 
-        if (!ModelState.IsValid)
+        if (!string.IsNullOrWhiteSpace(cleanTable)
+            && !cleanName.StartsWith(cleanTable, StringComparison.OrdinalIgnoreCase))
+        {
+            var combined = $"{cleanTable} - {cleanName}";
+            customer.DisplayName = combined.Length > 30 ? combined[..30].Trim() : combined;
+        }
+        else
+        {
+            customer.DisplayName = cleanName;
+        }
+
+        ModelState.Clear();
+        if (!TryValidateModel(customer))
+        {
+            if (isHomeSource)
+            {
+                var firstError = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .FirstOrDefault() ?? "Please enter a valid name (2–30 letters or numbers).";
+
+                TempData["SessionError"] = firstError;
+                TempData["EnteredName"] = cleanName;
+                TempData["EnteredTable"] = cleanTable;
+                return RedirectToAction("Index", "Home", new { table = cleanTable });
+            }
+
             return View(customer);
+        }
 
         try
         {
             await _customerSessionService.BeginSessionAsync(customer.DisplayName);
 
-            return RedirectToAction("MySession", "Customers");
+            return RedirectToAction("Index", "Products");
         }
         catch (InvalidOperationException ex)
         {
+            if (isHomeSource)
+            {
+                TempData["SessionError"] = ex.Message;
+                TempData["EnteredName"] = cleanName;
+                TempData["EnteredTable"] = cleanTable;
+                return RedirectToAction("Index", "Home", new { table = cleanTable });
+            }
+
             ModelState.AddModelError(nameof(customer.DisplayName), ex.Message);
         }
         catch (DbUpdateException)
         {
-            ModelState.AddModelError(nameof(customer.DisplayName),
-                "That display name is already in use. Choose another name.");
+            const string duplicateMsg = "That display name is already in use. Choose another name.";
+            if (isHomeSource)
+            {
+                TempData["SessionError"] = duplicateMsg;
+                TempData["EnteredName"] = cleanName;
+                TempData["EnteredTable"] = cleanTable;
+                return RedirectToAction("Index", "Home", new { table = cleanTable });
+            }
+
+            ModelState.AddModelError(nameof(customer.DisplayName), duplicateMsg);
         }
 
         return View(customer);
@@ -184,6 +232,6 @@ public class CustomersController : Controller
     {
         await _customerSessionService.EndSessionAsync();
 
-        return RedirectToAction(nameof(Create));
+        return RedirectToAction("Index", "Home");
     }
 }

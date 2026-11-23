@@ -1,20 +1,70 @@
+/*
+
+wwwroot/css/site.css
+
+QRDER Design System:
+
+Warm Espresso Sidebar (#36241c) & Warm Cream Cards (#ede0c9 / #ffffff) matching reference POS aesthetic
+
+QRDER Brand Typography: Tiempos Text / Source Serif 4 in ALL CAPS
+
+Separate PC Desktop POS Workspace (Owner/Employee) vs. Mobile-Only Ordering Shell (Customer)
+
+Full Light & Dark mode compatibility via [data-theme="dark"]
+*/
+
+:root {
+--qrder-espresso: #36241c;
+--qrder-espresso-deep: #2a1b15;
+--qrder-espresso-hover: #4a3329;
+--qrder-cream-pill: #ede0c9;
+--qrder-cream-soft: #f5ede0;
+--qrder-canvas: #f8f4ed;
+--qrder-surface: #ffffff;
+--qrder-border: #e6ddd0;
+--qrder-ink: #2b1d16;
+--qrder-muted: #7a6a5e;
+--qrder-accent: #c05800;
+--qrder-wordmark-font: "Tiempos Text", "Source Serif 4", Georgia, "Times New Roman", serif;
+}
+
+[data-theme="dark"] {
+--qrder-espresso: #231712;
+--qrder-espresso-deep: #1a110d;
+--qrder-espresso-hover: #35231b;
+--qrder-cream-pill: #d5a66b;
+--qrder-cream-soft: #2c201a;
+--qrder-canvas: #161210;
+--qrder-surface: #201a17;
+--qrder-border: #362b25;
+--qrder-ink: #f4ece1;
+--qrder-muted: #b5a698;
+--qrder-accent: #d5a66b;
+}
+
 html {
-    font-size: 14px;
-    position: relative;
-    min-height: 100%;
+font-size: 14px;
+position: relative;
+min-height: 100%;
 }
 
 @media (min-width: 768px) {
-    html {
-        font-size: 16px;
-    }
+html {
+font-size: 15px;
+}
 }
 
 body {
-    margin-bottom: 96px;
-    background-color: var(--bs-body-bg);
-    color: var(--bs-body-color);
-    transition: background-color .2s ease, color .2s ease;
+background-color: var(--qrder-canvas);
+color: var(--qrder-ink);
+transition: background-color 0.2s ease, color 0.2s ease;
+margin: 0;
+}
+
+.qrder-wordmark-inline {
+font-family: var(--qrder-wordmark-font);
+text-transform: uppercase;
+letter-spacing: 0.08em;
 }
 
 .btn:focus,
@@ -22,190 +72,579 @@ body {
 .btn-link.nav-link:focus,
 .form-control:focus,
 .form-check-input:focus {
-    box-shadow: 0 0 0 0.1rem var(--bs-body-bg), 0 0 0 0.25rem #258cfb;
+box-shadow: 0 0 0 0.12rem var(--qrder-canvas), 0 0 0 0.28rem rgba(192, 88, 0, 0.45);
 }
 
-.form-floating > .form-control-plaintext::placeholder,
-.form-floating > .form-control::placeholder {
-    color: var(--bs-secondary-color);
-    text-align: end;
+/* =========================================================
+
+PC OWNER / STAFF POS SHELL (LEFT SIDEBAR + WORKSPACE)
+========================================================= */
+
+.qrder-pos-shell {
+display: flex;
+min-height: 100vh;
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder,
-.form-floating > .form-control:focus::placeholder {
-    text-align: start;
+.qrder-sidebar {
+width: 248px;
+flex-shrink: 0;
+background-color: var(--qrder-espresso);
+color: #f6efe6;
+display: flex;
+flex-direction: column;
+padding: 0.85rem 0.85rem 0.75rem;
+position: sticky;
+top: 0;
+height: 100vh;
+overflow: hidden;
+z-index: 1040;
+border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-/* Navbar */
-.navbar {
-    background-color: var(--bs-tertiary-bg) !important;
-    border-color: var(--bs-border-color) !important;
+.qrder-sidebar-top {
+margin-bottom: 0.85rem;
 }
 
-.navbar-brand,
-.navbar .nav-link {
-    color: var(--bs-emphasis-color) !important;
+.qrder-brand-card {
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+background-color: #ede0c9;
+color: #2b1d16;
+text-decoration: none;
+border-radius: 12px;
+padding: 0.6rem 0.65rem 0.55rem;
+box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+transition: transform 0.15s ease;
 }
 
-.navbar .nav-link:hover {
-    color: var(--bs-primary) !important;
+.qrder-brand-card:hover {
+color: #2b1d16;
+transform: translateY(-1px);
 }
 
-.navbar-toggler {
-    border-color: var(--bs-border-color);
+.qrder-brand-icon {
+width: 32px;
+height: 32px;
+object-fit: contain;
+margin-bottom: 0.2rem;
 }
 
-.navbar-toggler-icon {
-    filter: var(--navbar-toggler-filter, none);
+.qrder-brand-wordmark {
+font-family: var(--qrder-wordmark-font);
+font-size: 1.4rem;
+font-weight: 700;
+text-transform: uppercase;
+letter-spacing: 0.12em;
+line-height: 1.05;
+color: #2b1d16;
 }
 
-[data-theme="dark"] .navbar-toggler-icon {
-    filter: invert(1);
+.qrder-brand-tag {
+font-size: 0.58rem;
+font-weight: 700;
+letter-spacing: 0.2em;
+text-transform: uppercase;
+color: #6b5244;
+margin-top: 0.15rem;
 }
 
-/* General surfaces */
+.qrder-pos-caption {
+text-align: center;
+font-size: 0.62rem;
+font-weight: 700;
+letter-spacing: 0.2em;
+color: #d6c7b6;
+margin-top: 0.45rem;
+}
+
+.qrder-sidebar-section-label {
+font-size: 0.64rem;
+font-weight: 700;
+letter-spacing: 0.14em;
+color: #a99584;
+padding: 0 0.65rem;
+margin-bottom: 0.35rem;
+}
+
+.qrder-sidebar-nav {
+display: flex;
+flex-direction: column;
+gap: 0.15rem;
+flex-grow: 1;
+min-height: 0;
+}
+
+.qrder-nav-item {
+display: flex;
+align-items: center;
+gap: 0.65rem;
+padding: 0.48rem 0.75rem;
+border-radius: 10px;
+color: #efe5d8;
+text-decoration: none;
+font-size: 0.88rem;
+font-weight: 500;
+white-space: nowrap;
+transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.qrder-nav-item:hover {
+background-color: var(--qrder-espresso-hover);
+color: #ffffff;
+}
+
+.qrder-nav-item.active {
+background-color: #ede0c9;
+color: #2b1d16;
+font-weight: 700;
+box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.qrder-nav-icon {
+width: 1.15rem;
+text-align: center;
+font-size: 0.92rem;
+opacity: 0.9;
+}
+
+.qrder-sidebar-footer {
+margin-top: 0.65rem;
+padding-top: 0.6rem;
+border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.qrder-sidebar-theme-btn {
+background-color: rgba(255, 255, 255, 0.08);
+color: #f3e8da;
+border: 1px solid rgba(255, 255, 255, 0.16);
+border-radius: 8px;
+font-size: 0.78rem;
+padding: 0.35rem 0.65rem;
+}
+
+.qrder-sidebar-theme-btn:hover {
+background-color: rgba(255, 255, 255, 0.16);
+color: #ffffff;
+}
+
+.qrder-sidebar-account .navbar-nav {
+flex-direction: column;
+gap: 0.15rem;
+max-width: 100%;
+}
+
+.qrder-sidebar-account .nav-item {
+max-width: 100%;
+overflow: hidden;
+}
+
+.qrder-sidebar-account .nav-link,
+.qrder-sidebar-account button.nav-link {
+color: #e6d8c7 !important;
+font-size: 0.78rem;
+padding: 0.2rem 0.35rem;
+text-align: left;
+text-decoration: none;
+display: block;
+max-width: 100%;
+overflow: hidden;
+text-overflow: ellipsis;
+white-space: nowrap;
+}
+
+.qrder-sidebar-account .nav-link:hover,
+.qrder-sidebar-account button.nav-link:hover {
+color: #ffffff !important;
+text-decoration: underline;
+}
+
+.qrder-branch-caption {
+margin-top: 0.45rem;
+font-size: 0.7rem;
+color: #a99584;
+padding-left: 0.35rem;
+}
+
+.qrder-pos-main {
+flex-grow: 1;
+min-width: 0;
+display: flex;
+flex-direction: column;
+background-color: var(--qrder-canvas);
+}
+
+.qrder-pos-topbar {
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 0.75rem 1rem;
+background-color: var(--qrder-espresso);
+color: #f6efe6;
+}
+
+.qrder-topbar-btn {
+background-color: #ede0c9;
+color: #2b1d16;
+font-weight: 600;
+border-radius: 8px;
+}
+
+.qrder-role-pill {
+background-color: rgba(237, 224, 201, 0.2);
+color: #ede0c9;
+font-weight: 600;
+}
+
+.qrder-pos-content {
+padding: 1.75rem 2.25rem;
+max-width: 1440px;
+width: 100%;
+}
+
+@media (max-width: 991.98px) {
+.qrder-sidebar {
+position: fixed;
+left: -275px;
+top: 0;
+bottom: 0;
+transition: left 0.22s ease;
+}
+
+.qrder-sidebar.open {
+    left: 0;
+}
+
+.qrder-sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.48);
+    z-index: 1035;
+}
+
+.qrder-sidebar-backdrop.show {
+    display: block;
+}
+
+.qrder-pos-content {
+    padding: 1.25rem 1rem;
+}
+
+
+}
+
+/* =========================================================
+2. MOBILE-PRIORITY, PC-ADAPTIVE CUSTOMER ORDERING SHELL
+========================================================= */
+
+.qrder-mobile-body {
+padding-bottom: 1.5rem;
+}
+
+.qrder-mobile-container {
+width: 100%;
+max-width: 1140px;
+margin-left: auto;
+margin-right: auto;
+padding-left: 1rem;
+padding-right: 1rem;
+}
+
+@media (min-width: 768px) {
+.qrder-mobile-container {
+padding-left: 1.75rem;
+padding-right: 1.75rem;
+}
+}
+
+.qrder-mobile-header {
+background-color: var(--qrder-espresso);
+color: #f6efe6;
+padding: 0.65rem 0;
+box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16);
+z-index: 1030;
+}
+
+.qrder-mobile-brand {
+display: inline-flex;
+align-items: center;
+gap: 0.65rem;
+color: #f6efe6 !important;
+text-decoration: none !important;
+}
+
+.qrder-mobile-brand:hover {
+color: #ffffff !important;
+opacity: 0.94;
+}
+
+.qrder-mobile-logo-badge {
+width: 36px;
+height: 36px;
+border-radius: 10px;
+background-color: #ede0c9;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+flex-shrink: 0;
+box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.qrder-mobile-logo-icon {
+width: 24px !important;
+height: 24px !important;
+max-width: 24px;
+max-height: 24px;
+object-fit: contain;
+display: block;
+}
+
+.qrder-mobile-wordmark {
+font-family: var(--qrder-wordmark-font);
+font-size: 1.25rem;
+font-weight: 700;
+letter-spacing: 0.12em;
+color: #f6efe6;
+text-transform: uppercase;
+}
+
+.qrder-mobile-sub {
+font-size: 0.72rem;
+color: #d6c7b6;
+margin-top: 0.12rem;
+letter-spacing: 0.03em;
+}
+
+.qrder-mobile-icon-btn {
+background-color: rgba(255, 255, 255, 0.1);
+color: #f6efe6 !important;
+border: 1px solid rgba(255, 255, 255, 0.22);
+border-radius: 999px;
+width: 34px;
+height: 34px;
+padding: 0;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+}
+
+.qrder-mobile-icon-btn:hover {
+background-color: rgba(255, 255, 255, 0.2);
+color: #ffffff !important;
+}
+
+.qrder-mobile-login .navbar-nav {
+flex-direction: row;
+align-items: center;
+gap: 0.45rem;
+margin: 0;
+}
+
+.qrder-mobile-login .nav-link,
+.qrder-mobile-login button.nav-link {
+color: #f6efe6 !important;
+background-color: rgba(255, 255, 255, 0.1);
+border: 1px solid rgba(255, 255, 255, 0.24);
+border-radius: 999px;
+padding: 0.3rem 0.85rem !important;
+font-size: 0.82rem;
+font-weight: 600;
+text-decoration: none !important;
+line-height: 1.2;
+}
+
+.qrder-mobile-login .nav-link:hover,
+.qrder-mobile-login button.nav-link:hover {
+background-color: #ede0c9;
+color: #2b1d16 !important;
+border-color: #ede0c9;
+}
+
+.qrder-mobile-main {
+padding-top: 1.35rem;
+}
+
+.qrder-customer-footer a {
+color: var(--qrder-ink);
+font-weight: 600;
+}
+
+.qrder-customer-footer a:hover {
+color: var(--qrder-accent);
+text-decoration: underline !important;
+}
+
+/* =========================================================
+3. SHARED QRDER SURFACES, CARDS & TYPOGRAPHY
+========================================================= */
+
+.qrder-eyebrow {
+font-size: 0.72rem;
+font-weight: 700;
+letter-spacing: 0.14em;
+text-transform: uppercase;
+color: var(--qrder-muted);
+margin-bottom: 0.25rem;
+}
+
+.qrder-page-title {
+font-size: 1.85rem;
+font-weight: 800;
+color: var(--qrder-ink);
+margin-bottom: 0.2rem;
+}
+
+.qrder-page-subtitle {
+font-size: 0.92rem;
+color: var(--qrder-muted);
+margin-bottom: 1.35rem;
+}
+
+.qrder-card,
 .card,
 .dropdown-menu,
 .modal-content {
-    background-color: var(--bs-tertiary-bg);
-    color: var(--bs-body-color);
-    border-color: var(--bs-border-color);
+background-color: var(--qrder-surface);
+color: var(--qrder-ink);
+border: 1px solid var(--qrder-border);
+border-radius: 16px;
+}
+
+.qrder-card {
+padding: 1.35rem;
+box-shadow: 0 2px 10px rgba(43, 29, 22, 0.04);
+}
+
+.qrder-callout {
+background-color: var(--qrder-cream-soft);
+border: 1px solid var(--qrder-border);
+border-radius: 14px;
+padding: 1rem 1.15rem;
 }
 
 .table {
-    --bs-table-color: var(--bs-body-color);
-    --bs-table-bg: transparent;
-    --bs-table-border-color: var(--bs-border-color);
+--bs-table-color: var(--qrder-ink);
+--bs-table-bg: transparent;
+--bs-table-border-color: var(--qrder-border);
 }
 
 .form-control,
 .form-select {
-    background-color: var(--bs-body-bg);
-    color: var(--bs-body-color);
-    border-color: var(--bs-border-color);
+background-color: var(--qrder-surface);
+color: var(--qrder-ink);
+border-color: var(--qrder-border);
+border-radius: 10px;
 }
 
 .form-control::placeholder {
-    color: var(--bs-secondary-color);
+color: var(--qrder-muted);
 }
 
-footer {
-    background-color: var(--bs-body-bg);
-    border-color: var(--bs-border-color) !important;
-}
-
-footer,
-footer a {
-    color: var(--bs-secondary-color);
-}
-
-/* Product menu */
+/* Product Menu Cards (Preserved & Theme-Aligned) */
 .menu-heading,
 .product-name {
-    color: var(--bs-emphasis-color) !important;
+color: var(--qrder-ink) !important;
 }
 
 .product-card {
-    background-color: var(--bs-tertiary-bg) !important;
-    border-color: var(--bs-border-color) !important;
+background-color: var(--qrder-surface) !important;
+border: 1px solid var(--qrder-border) !important;
+border-radius: 14px !important;
 }
 
 .product-image,
 .product-placeholder {
-    background-color: var(--bs-secondary-bg) !important;
+background-color: var(--qrder-cream-soft) !important;
 }
 
 .product-placeholder {
-    color: var(--bs-secondary-color) !important;
+color: var(--qrder-muted) !important;
 }
 
 .product-price {
-    color: var(--bs-emphasis-color) !important;
+color: var(--qrder-ink) !important;
 }
 
 .menu-btn {
-    background-color: #3b2921;
-    color: white;
-    border: none;
+background-color: #36241c;
+color: #ffffff;
+border: none;
+border-radius: 10px;
 }
 
 .menu-btn:hover {
-    background-color: #604536;
-    color: white;
+background-color: #543a2e;
+color: #ffffff;
 }
 
 [data-theme="dark"] .menu-btn {
-    background-color: #d5a66b;
-    color: #241a15;
+background-color: #d5a66b;
+color: #241a15;
 }
 
 [data-theme="dark"] .menu-btn:hover {
-    background-color: #e5bb89;
-    color: #241a15;
+background-color: #e5bb89;
+color: #241a15;
 }
 
-@media (max-width: 991.98px) {
-    .navbar .navbar-collapse .nav-link {
-        padding-top: 0.7rem;
-        padding-bottom: 0.7rem;
-    }
-
-    .nav-theme-toggle {
-        width: 100%;
-        margin-left: 0 !important;
-    }
-}
+/* =========================================================
+4. RESPONSIVE STACK TABLES (NARROW MOBILE FALLBACK)
+========================================================= */
 
 @media (max-width: 767.98px) {
-    table.stack-table thead {
-        display: none;
-    }
+table.stack-table thead {
+display: none;
+}
 
-    table.stack-table,
-    table.stack-table tbody,
-    table.stack-table tr,
-    table.stack-table td {
-        display: block;
-        width: 100%;
-    }
+table.stack-table,
+table.stack-table tbody,
+table.stack-table tr,
+table.stack-table td {
+    display: block;
+    width: 100%;
+}
 
-    table.stack-table tr {
-        margin-bottom: 0.75rem;
-        border: 1px solid var(--bs-border-color);
-        border-radius: 12px;
-        padding: 0.85rem 1rem;
-        background: var(--bs-tertiary-bg);
-    }
+table.stack-table tr {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--qrder-border);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    background: var(--qrder-surface);
+}
 
-    table.stack-table > :not(caption) > * > * {
-        border: 0;
-        background: transparent;
-        box-shadow: none;
-        color: inherit;
-        padding: 0.35rem 0;
-        text-align: left !important;
-        overflow-wrap: anywhere;
-    }
+table.stack-table > :not(caption) > * > * {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: inherit;
+    padding: 0.35rem 0;
+    text-align: left !important;
+    overflow-wrap: anywhere;
+}
 
-    table.stack-table td::before {
-        content: attr(data-label);
-        display: block;
-        margin-bottom: 0.1rem;
-        font-size: 0.75rem;
-        font-weight: 650;
-        letter-spacing: 0.02em;
-        text-transform: uppercase;
-        color: var(--bs-secondary-color);
-    }
+table.stack-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.1rem;
+    font-size: 0.75rem;
+    font-weight: 650;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--qrder-muted);
+}
 
-    table.stack-table td .btn {
-        width: 100%;
-        margin-top: 0.25rem;
-    }
+table.stack-table td .btn {
+    width: 100%;
+    margin-top: 0.25rem;
+}
 
-    table.stack-table td a,
-    table.stack-table td .btn-link {
-        padding-top: 0.35rem;
-        padding-bottom: 0.35rem;
-    }
+table.stack-table td a,
+table.stack-table td .btn-link {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+}
+
+
 }
