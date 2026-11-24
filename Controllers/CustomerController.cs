@@ -1,9 +1,13 @@
+// Controllers/CustomerController.cs
+// Manages customer table/walk-in sessions for both Staff/Owner POS users
+// and anonymous mobile customers.
+
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using orderManagementSystem.Data;
 using orderManagementSystem.Models;
 using orderManagementSystem.Services;
-using Microsoft.AspNetCore.Authorization;
 
 namespace orderManagementSystem.Controllers;
 
@@ -12,23 +16,22 @@ public class CustomersController : Controller
 {
     private readonly ApplicationDbContext _context;
     private readonly CustomerSessionService _customerSessionService;
+    private readonly AuditLogService _auditLog;
 
     public CustomersController(
         ApplicationDbContext context,
-        CustomerSessionService customerSessionService)
+        CustomerSessionService customerSessionService,
+        AuditLogService auditLog)
     {
         _context = context;
         _customerSessionService = customerSessionService;
+        _auditLog = auditLog;
     }
 
-    private Task<bool> ActiveNameExistsAsync(string name, int? exceptId = null)
-    {
-        var normalized = name.Trim().ToLower();
-        return _context.Customers.AnyAsync(c =>
-            c.IsActive && c.Id != exceptId &&
-            c.DisplayName.ToLower() == normalized);
-    }
+    private bool IsStaff => User.IsInRole("Owner") || User.IsInRole("Employee");
 
+    // STAFF / OWNER: View all customer sessions sorted newest-first
+    [HttpGet]
     public async Task<IActionResult> Index()
     {
         await _customerSessionService.ExpireInactiveSessionsAsync();
@@ -40,6 +43,7 @@ public class CustomersController : Controller
         return View(customers);
     }
 
+    // STAFF / OWNER: Live search customer sessions
     [HttpGet]
     public async Task<IActionResult> Search(string term = "")
     {
@@ -59,6 +63,14 @@ public class CustomersController : Controller
         return PartialView("_CustomerRows", customers);
     }
 
+    // STAFF / OWNER: Render form to create a walk-in or table session
+    [HttpGet]
+    public IActionResult Create()
+    {
+        return View(new Customer());
+    }
+
+    // CUSTOMER (anonymous) or STAFF / OWNER: Create a new customer session
     [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -105,6 +117,24 @@ public class CustomersController : Controller
         {
             await _customerSessionService.BeginSessionAsync(customer.DisplayName);
 
+            if (IsStaff)
+            {
+                var createdId = await _context.Customers
+                    .AsNoTracking()
+                    .Where(c => c.DisplayName == customer.DisplayName && c.IsActive)
+                    .OrderByDescending(c => c.Id)
+                    .Select(c => (int?)c.Id)
+                    .FirstOrDefaultAsync();
+
+                await _auditLog.LogAsync(
+                    "CustomerSessionCreated",
+                    "Customer",
+                    createdId?.ToString(),
+                    $"Staff created walk-in customer session \"{customer.DisplayName}\".");
+
+                return RedirectToAction("CreateForCustomer", "Orders", new { customerId = createdId });
+            }
+
             return RedirectToAction("Index", "Products");
         }
         catch (InvalidOperationException ex)
@@ -136,92 +166,138 @@ public class CustomersController : Controller
         return View(customer);
     }
 
+    // STAFF / OWNER: View session details
+    [HttpGet]
     public async Task<IActionResult> Details(int? id)
     {
-        if (id == null) return NotFound();
-        await _customerSessionService.ExpireInactiveSessionsAsync();
+        if (id == null)
+        {
+            return NotFound();
+        }
 
         var customer = await _context.Customers
             .AsNoTracking()
-            .Include(c => c.Orders)
-            .FirstOrDefaultAsync(c => c.Id == id);
+            .FirstOrDefaultAsync(m => m.Id == id);
 
-        return customer == null ? NotFound() : View(customer);
+        if (customer == null)
+        {
+            return NotFound();
+        }
+
+        return View(customer);
     }
 
+    // STAFF / OWNER: Render edit form for a customer session
+    [HttpGet]
     public async Task<IActionResult> Edit(int? id)
     {
-        if (id == null) return NotFound();
-        await _customerSessionService.ExpireInactiveSessionsAsync();
+        if (id == null)
+        {
+            return NotFound();
+        }
+
         var customer = await _context.Customers.FindAsync(id);
-        return customer == null ? NotFound() : View(customer);
+        if (customer == null)
+        {
+            return NotFound();
+        }
+
+        return View(customer);
     }
 
+    // STAFF / OWNER: Save updates to a customer session
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, [Bind("Id,DisplayName")] Customer submitted)
+    public async Task<IActionResult> Edit(int id, [Bind("Id,DisplayName,IsActive")] Customer customer)
     {
-        if (id != submitted.Id) return NotFound();
-        await _customerSessionService.ExpireInactiveSessionsAsync();
-        submitted.DisplayName = (submitted.DisplayName ?? string.Empty).Trim();
+        if (id != customer.Id)
+        {
+            return NotFound();
+        }
 
-        if (await ActiveNameExistsAsync(submitted.DisplayName, id))
-            ModelState.AddModelError(nameof(submitted.DisplayName),
-                "That display name is already in use by an active customer.");
+        customer.DisplayName = (customer.DisplayName ?? string.Empty).Trim();
 
-        if (!ModelState.IsValid) return View(submitted);
+        ModelState.Clear();
+        if (!TryValidateModel(customer))
+        {
+            return View(customer);
+        }
 
-        var customer = await _context.Customers.FindAsync(id);
-        if (customer == null) return NotFound();
-        customer.DisplayName = submitted.DisplayName;
+        var existing = await _context.Customers.FirstOrDefaultAsync(c => c.Id == id);
+        if (existing == null)
+        {
+            return NotFound();
+        }
+
+        existing.DisplayName = customer.DisplayName;
+        existing.IsActive = customer.IsActive;
+        if (customer.IsActive)
+        {
+            existing.LastActivityUtc = DateTime.UtcNow;
+        }
 
         try
         {
             await _context.SaveChangesAsync();
+
+            await _auditLog.LogAsync(
+                "CustomerSessionUpdated",
+                "Customer",
+                existing.Id.ToString(),
+                $"Updated customer session #{existing.Id} to \"{existing.DisplayName}\" (Active: {existing.IsActive}).");
+
+            return RedirectToAction(nameof(Index));
         }
         catch (DbUpdateException)
         {
-            ModelState.AddModelError(nameof(submitted.DisplayName),
-                "That display name is already in use. Choose another name.");
-            return View(submitted);
+            ModelState.AddModelError(nameof(customer.DisplayName), "That display name is already in use.");
+            return View(customer);
         }
-
-        return RedirectToAction(nameof(Details), new { id });
     }
 
+    // STAFF / OWNER: Confirm ending a customer session
+    [HttpGet]
     public async Task<IActionResult> Delete(int? id)
     {
-        if (id == null) return NotFound();
+        if (id == null)
+        {
+            return NotFound();
+        }
+
         var customer = await _context.Customers
-            .FirstOrDefaultAsync(c => c.Id == id);
-        return customer == null ? NotFound() : View(customer);
+            .AsNoTracking()
+            .FirstOrDefaultAsync(m => m.Id == id);
+
+        if (customer == null)
+        {
+            return NotFound();
+        }
+
+        return View(customer);
     }
 
-    // End the session; do not delete the customer row or its order history.
+    // STAFF / OWNER: End/deactivate a customer session
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)
     {
         var customer = await _context.Customers.FindAsync(id);
-        if (customer == null) return NotFound();
+        if (customer != null)
+        {
+            customer.IsActive = false;
+            await _context.SaveChangesAsync();
 
-        customer.IsActive = false;
-        await _context.SaveChangesAsync();
+            await _auditLog.LogAsync(
+                "CustomerSessionEndedByStaff",
+                "Customer",
+                customer.Id.ToString(),
+                $"Staff ended customer session \"{customer.DisplayName}\".");
+        }
+
         return RedirectToAction(nameof(Index));
     }
 
-    [AllowAnonymous]
-    [HttpGet]
-    public async Task<IActionResult> MySession()
-    {
-        var customer = await _customerSessionService.GetCurrentCustomerAsync();
-
-        if (customer == null)
-            return RedirectToAction(nameof(Create));
-
-        return View(customer);
-    }
-    
+    // CUSTOMER: Update own display name or Dine-In / Take-Out preference mid-session
     [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -312,6 +388,7 @@ public class CustomersController : Controller
         return RedirectToAction("Index", "Home");
     }
 
+    // CUSTOMER: End own active session
     [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]

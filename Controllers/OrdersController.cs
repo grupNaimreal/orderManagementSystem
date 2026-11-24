@@ -87,11 +87,12 @@ public class OrdersController : Controller
 
     // STAFF: display the counter ordering form
     [HttpGet]
-    public async Task<IActionResult> CreateForCustomer()
+    public async Task<IActionResult> CreateForCustomer(int? customerId = null)
     {
         var model = new OrderCreateViewModel
         {
             IsStaffOrder = true,
+            CustomerId = customerId,
             PaymentMethod = OrderPaymentMethods.Cash
         };
 
@@ -244,7 +245,7 @@ public class OrdersController : Controller
             order.Id.ToString(),
             $"Created Order #{order.Id} for {order.CustomerName} ({order.PaymentMethod}, ₱{order.TotalAmount:N2}).");
 
-        // Option 5B: Redirect customer to Maya Sandbox Checkout
+        // Redirect customer to Maya Sandbox Checkout
         if (!model.IsStaffOrder && order.PaymentMethod == "Maya")
         {
             return await InitiateMayaRedirectAsync(order);
@@ -275,7 +276,7 @@ public class OrdersController : Controller
         }
         catch (Exception ex)
         {
-            TempData["PaymentError"] = $"Could not start Maya Checkout: {ex.Message}";
+            TempData["PaymentError"] = $"Could not start online checkout: {ex.Message}";
             return RedirectToAction(nameof(Details), new { id = order.Id });
         }
     }
@@ -327,7 +328,7 @@ public class OrdersController : Controller
         return await InitiateMayaRedirectAsync(order);
     }
 
-    // CUSTOMER: Return callback URL from Maya Sandbox Checkout (verifies payment via Maya Secret Key)
+    // CUSTOMER: Return callback URL from Maya Sandbox Checkout (strictly verifies PAYMENT_SUCCESS)
     [AllowAnonymous]
     [HttpGet]
     public async Task<IActionResult> MayaReturn(int id, string? outcome = null)
@@ -345,8 +346,9 @@ public class OrdersController : Controller
             try
             {
                 var status = await _mayaCheckoutService.GetCheckoutStatusAsync(order.PayMongoCheckoutSessionId);
+                var isFailureCallback = string.Equals(outcome, "failure", StringComparison.OrdinalIgnoreCase);
 
-                if (status.IsPaid)
+                if (status.IsPaid && !isFailureCallback)
                 {
                     order.PaymentStatus = OrderPaymentStatuses.Paid;
                     order.PaymentPaidAtUtc = DateTime.UtcNow;
@@ -357,26 +359,62 @@ public class OrdersController : Controller
                         "MayaPaymentConfirmed",
                         "Order",
                         order.Id.ToString(),
-                        $"Maya Sandbox payment verified for Order #{order.Id} (Ref: {order.PayMongoPaymentId}).");
+                        $"Online payment verified for Order #{order.Id} (Ref: {order.PayMongoPaymentId}).");
 
-                    TempData["PaymentNotice"] = "Maya payment confirmed! Your order is now queued for preparation.";
+                    TempData["PaymentNotice"] = "Online payment confirmed! Your order is now queued for preparation.";
                 }
-                else if (status.IsFailed || string.Equals(outcome, "failure", StringComparison.OrdinalIgnoreCase))
+                else if (status.IsFailed || isFailureCallback)
                 {
-                    TempData["PaymentError"] = "Maya payment was declined or did not complete. You can retry checkout below.";
+                    // Clear dead checkout link so the customer generates a fresh Maya session on retry
+                    order.PayMongoCheckoutUrl = null;
+                    await _context.SaveChangesAsync();
+
+                    var reasonDetail = !string.IsNullOrWhiteSpace(status.FailureReason)
+                        ? status.FailureReason
+                        : (!string.IsNullOrWhiteSpace(status.RawPaymentStatus) ? status.RawPaymentStatus : "DECLINED");
+
+                    await _auditLog.LogAsync(
+                        "MayaPaymentDeclined",
+                        "Order",
+                        order.Id.ToString(),
+                        $"Online payment declined/failed for Order #{order.Id} (Status: {status.RawStatus}, PaymentStatus: {status.RawPaymentStatus}, Reason: {reasonDetail}).");
+
+                    TempData["PaymentError"] = "Payment was declined or failed. Your order has NOT been marked as paid—please generate a new online payment session below or pay Cash at the counter.";
+                }
+                else if (status.IsExpired)
+                {
+                    order.PayMongoCheckoutUrl = null;
+                    await _context.SaveChangesAsync();
+
+                    await _auditLog.LogAsync(
+                        "MayaPaymentExpired",
+                        "Order",
+                        order.Id.ToString(),
+                        $"Online checkout session expired for Order #{order.Id}.");
+
+                    TempData["PaymentError"] = "Your online checkout session expired. Please generate a new payment session below.";
                 }
                 else if (string.Equals(outcome, "cancel", StringComparison.OrdinalIgnoreCase))
                 {
-                    TempData["PaymentNotice"] = "Maya checkout was cancelled. Click Complete Maya Checkout below to resume payment.";
+                    await _auditLog.LogAsync(
+                        "MayaCheckoutCancelled",
+                        "Order",
+                        order.Id.ToString(),
+                        $"Customer cancelled online checkout before completing payment for Order #{order.Id}.");
+
+                    TempData["PaymentNotice"] = "Online checkout was cancelled. Click the button below to resume or start a new payment session.";
                 }
                 else
                 {
-                    TempData["PaymentNotice"] = $"Maya checkout status is currently {status.RawPaymentStatus}. If you just completed payment, refresh in a moment.";
+                    var displayStatus = string.IsNullOrWhiteSpace(status.RawPaymentStatus)
+                        ? status.RawStatus
+                        : status.RawPaymentStatus;
+                    TempData["PaymentNotice"] = $"Payment status is currently {displayStatus}. Complete payment or generate a new session below.";
                 }
             }
             catch (Exception ex)
             {
-                TempData["PaymentError"] = $"Could not verify Maya payment right now: {ex.Message}";
+                TempData["PaymentError"] = $"Could not verify online payment right now: {ex.Message}";
             }
         }
 
@@ -394,7 +432,7 @@ public class OrdersController : Controller
 
         if (string.IsNullOrWhiteSpace(order.PayMongoCheckoutSessionId))
         {
-            TempData["PaymentError"] = "No Maya checkout session ID is attached to this order yet.";
+            TempData["PaymentError"] = "No online checkout session ID is attached to this order yet.";
             return RedirectToAction(nameof(Details), new { id = order.Id });
         }
 
@@ -412,13 +450,32 @@ public class OrdersController : Controller
                     "MayaPaymentVerifiedByStaff",
                     "Order",
                     order.Id.ToString(),
-                    $"Staff verified Maya Sandbox payment for Order #{order.Id}.");
+                    $"Staff verified online payment for Order #{order.Id}.");
 
-                TempData["PaymentNotice"] = "Maya Sandbox confirmed this order is PAID.";
+                TempData["PaymentNotice"] = "Maya confirmed this order is PAID.";
+            }
+            else if (status.IsFailed)
+            {
+                order.PayMongoCheckoutUrl = null;
+                await _context.SaveChangesAsync();
+
+                await _auditLog.LogAsync(
+                    "MayaPaymentDeclined",
+                    "Order",
+                    order.Id.ToString(),
+                    $"Staff verified online payment was DECLINED/FAILED for Order #{order.Id} ({status.RawPaymentStatus}).");
+
+                TempData["PaymentError"] = $"Maya reported this payment was DECLINED / FAILED ({status.RawPaymentStatus}). Order remains Unpaid.";
+            }
+            else if (status.IsExpired)
+            {
+                order.PayMongoCheckoutUrl = null;
+                await _context.SaveChangesAsync();
+                TempData["PaymentError"] = "Maya reported this checkout session has EXPIRED. Order remains Unpaid.";
             }
             else
             {
-                TempData["PaymentNotice"] = $"Maya Sandbox status: {status.RawPaymentStatus} ({status.RawStatus}).";
+                TempData["PaymentNotice"] = $"Maya status: {status.RawPaymentStatus} ({status.RawStatus}).";
             }
         }
         catch (Exception ex)
@@ -450,7 +507,7 @@ public class OrdersController : Controller
                 order.Id.ToString(),
                 $"Staff manually confirmed Maya/QRPh payment for Order #{order.Id} (₱{order.TotalAmount:N2}).");
 
-            TempData["PaymentNotice"] = "Maya payment confirmed manually.";
+            TempData["PaymentNotice"] = "Online / QRPh payment confirmed manually.";
         }
 
         return RedirectToAction(nameof(Details), new { id = order.Id });

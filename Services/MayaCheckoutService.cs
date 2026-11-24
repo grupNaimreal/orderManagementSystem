@@ -2,7 +2,6 @@
 // Integrates QRDER (Bean Crate Cafe) with Maya Checkout v1 Sandbox API
 // (https://pg-sandbox.paymaya.com/checkout/v1/checkouts) supporting QRPh, Maya Wallet, and Cards.
 
-using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -119,7 +118,7 @@ public class MayaCheckoutService
     {
         if (string.IsNullOrWhiteSpace(checkoutId))
         {
-            return new MayaCheckoutStatusResult(false, false, false, "MISSING", "MISSING", null);
+            return new MayaCheckoutStatusResult(false, false, false, "MISSING", "MISSING", null, "Missing checkout ID.");
         }
 
         using var request = new HttpRequestMessage(
@@ -141,11 +140,11 @@ public class MayaCheckoutService
         var root = doc.RootElement;
 
         var status = root.TryGetProperty("status", out var statusEl)
-            ? (statusEl.GetString() ?? string.Empty).ToUpperInvariant()
+            ? (statusEl.GetString() ?? string.Empty).Trim().ToUpperInvariant()
             : string.Empty;
 
         var paymentStatus = root.TryGetProperty("paymentStatus", out var payStatusEl)
-            ? (payStatusEl.GetString() ?? string.Empty).ToUpperInvariant()
+            ? (payStatusEl.GetString() ?? string.Empty).Trim().ToUpperInvariant()
             : string.Empty;
 
         string? paymentRef = null;
@@ -160,9 +159,41 @@ public class MayaCheckoutService
             paymentRef = receiptEl.GetString();
         }
 
-        var isPaid = paymentStatus == "PAYMENT_SUCCESS" || status == "COMPLETED";
-        var isFailed = paymentStatus == "PAYMENT_FAILED" || status == "FAILED";
-        var isExpired = paymentStatus == "PAYMENT_EXPIRED" || status == "EXPIRED";
+        string? failureReason = null;
+        if (root.TryGetProperty("errorMessage", out var errMsgEl)
+            && errMsgEl.ValueKind == JsonValueKind.String)
+        {
+            failureReason = errMsgEl.GetString();
+        }
+        else if (root.TryGetProperty("paymentDetails", out var detailsEl)
+            && detailsEl.ValueKind == JsonValueKind.Object
+            && detailsEl.TryGetProperty("responses", out var respEl)
+            && respEl.ValueKind == JsonValueKind.Object
+            && respEl.TryGetProperty("efs", out var efsEl)
+            && efsEl.ValueKind == JsonValueKind.Object
+            && efsEl.TryGetProperty("result", out var resultEl)
+            && resultEl.ValueKind == JsonValueKind.String)
+        {
+            failureReason = resultEl.GetString();
+        }
+
+        // In Maya Checkout v1, `status == "COMPLETED"` only indicates the checkout UI session finished,
+        // even when a card or wallet transaction was declined (`paymentStatus == "PAYMENT_FAILED"`).
+        // Strictly require `paymentStatus == "PAYMENT_SUCCESS"` and explicitly reject failed/expired states.
+        var isFailed = paymentStatus is "PAYMENT_FAILED" or "DECLINED" or "AUTH_FAILED" or "PAYMENT_CANCELLED" or "VOIDED"
+                       || status is "FAILED" or "CANCELLED";
+
+        var isExpired = paymentStatus is "PAYMENT_EXPIRED" or "EXPIRED"
+                        || status == "EXPIRED";
+
+        var isPaid = !isFailed
+                     && !isExpired
+                     && paymentStatus == "PAYMENT_SUCCESS";
+
+        if (isFailed && string.IsNullOrWhiteSpace(failureReason))
+        {
+            failureReason = !string.IsNullOrWhiteSpace(paymentStatus) ? paymentStatus : status;
+        }
 
         return new MayaCheckoutStatusResult(
             isPaid,
@@ -170,7 +201,8 @@ public class MayaCheckoutService
             isExpired,
             status,
             paymentStatus,
-            paymentRef ?? checkoutId);
+            paymentRef ?? checkoutId,
+            failureReason);
     }
 
     private static AuthenticationHeaderValue BuildBasicAuth(string apiKey)
@@ -216,4 +248,5 @@ public sealed record MayaCheckoutStatusResult(
     bool IsExpired,
     string RawStatus,
     string RawPaymentStatus,
-    string? PaymentReference);
+    string? PaymentReference,
+    string? FailureReason = null);
