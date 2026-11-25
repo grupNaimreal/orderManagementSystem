@@ -65,7 +65,7 @@
 
 ### Run Locally (SQLite)
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/grupNaimreal/orderManagementSystem.git
 cd orderManagementSystem
 dotnet restore
 dotnet ef database update
