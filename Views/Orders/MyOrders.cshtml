@@ -1,52 +1,160 @@
+@*
+    Views/Orders/MyOrders.cshtml
+    Customer Order History & Live Status Tracker for QRDER (Bean Crate Cafe):
+    - Displays all orders placed during the customer's active session.
+    - Distinguishes between open Maya sessions and cancelled/closed sessions needing retry or Cash switch.
+    - Automatically polls for status updates every 8 seconds while any order is Pending or Preparing.
+*@
 @model IEnumerable<orderManagementSystem.Models.Order>
 
 @{
     ViewData["Title"] = "My Orders";
+    var ordersList = Model.ToList();
+
+    TimeZoneInfo ResolveManilaTimeZone()
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila"); }
+        catch
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time"); }
+            catch { return TimeZoneInfo.CreateCustomTimeZone("PHT", TimeSpan.FromHours(8), "Philippine Standard Time", "PHT"); }
+        }
+    }
+
+    var manilaTz = ResolveManilaTimeZone();
+    var hasActiveOrders = ordersList.Any(o => o.Status == "Pending" || o.Status == "Preparing");
+    var statusSignature = string.Join("|", ordersList.Select(o => $"{o.Id}:{o.Status}:{o.PaymentStatus}"));
+
+    string StatusBadgeStyle(string status) => status switch
+    {
+        "Pending" => "background-color: #fff3cd; color: #664d03; border: 1.5px solid #664d03;",
+        "Preparing" => "background-color: #cfe2ff; color: #084298; border: 1.5px solid #084298;",
+        "Completed" => "background-color: #d1e7dd; color: #0f5132; border: 1.5px solid #0f5132;",
+        "Cancelled" => "background-color: #f8d7da; color: #842029; border: 1.5px solid #842029;",
+        _ => "background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1.5px solid var(--qrder-border-strong);"
+    };
 }
 
-<h1>My Orders</h1>
-
-<p>
-    <a asp-action="Create" class="btn btn-primary w-100 w-sm-auto">
-        Place Another Order
-    </a>
-</p>
-
-@if (!Model.Any())
-{
-    <p class="text-muted">You haven't placed any orders yet.</p>
-}
-else
-{
-    <div class="table-responsive">
-        <table class="table table-striped stack-table">
-            <thead>
-                <tr>
-                    <th>Order #</th>
-                    <th>Date</th>
-                    <th>Total</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var order in Model)
-                {
-                    <tr>
-                        <td data-label="Order #">#@order.Id</td>
-                        <td data-label="Date">@order.OrderDate.ToLocalTime().ToString("MMM dd, yyyy hh:mm tt")</td>
-                        <td data-label="Total">₱@order.TotalAmount.ToString("N2")</td>
-                        <td data-label="Status">@order.Status</td>
-                        <td data-label="Action">
-                            <a asp-action="Details"
-                               asp-route-id="@order.Id"
-                               class="btn btn-sm btn-outline-primary">
-                                View Details
-                            </a>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+        <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; BEAN CRATE CAFE</div>
+        <h1 class="h3 fw-bold mb-0">My Orders</h1>
     </div>
+
+    <a asp-controller="Products" asp-action="Index" class="btn btn-sm menu-btn px-3 fw-bold">
+        + Order More
+    </a>
+</div>
+
+@if (hasActiveOrders)
+{
+    <div class="d-flex align-items-center justify-content-between gap-2 px-3 py-2 mb-3 small"
+         style="background-color: var(--qrder-cream-soft); border: 1.5px solid var(--qrder-border-strong); border-radius: var(--qrder-radius, 4px);">
+        <span class="fw-bold">
+            <span class="text-success me-1">&#9679;</span>
+            Live Order Tracking Active
+        </span>
+        <span class="text-muted fst-italic">Updates in real time</span>
+    </div>
+}
+
+<div id="qrderMyOrdersRoot" data-status-signature="@statusSignature">
+    @if (!ordersList.Any())
+    {
+        <div class="qrder-card text-center py-5">
+            <h2 class="h5 fw-bold mb-2">No orders yet</h2>
+            <p class="text-muted small mb-3">
+                Browse the Bean Crate Cafe menu to place your first order.
+            </p>
+            <a asp-controller="Products" asp-action="Index" class="btn menu-btn px-4 fw-bold">
+                Browse Menu
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex flex-column gap-3">
+            @foreach (var order in ordersList)
+            {
+                var localDate = TimeZoneInfo.ConvertTimeFromUtc(
+                    DateTime.SpecifyKind(order.OrderDate, DateTimeKind.Utc),
+                    manilaTz
+                );
+                var isPendingMaya = order.PaymentMethod == "Maya"
+                    && order.PaymentStatus == "Pending"
+                    && order.Status == "Pending";
+                var hasOpenCheckout = !string.IsNullOrWhiteSpace(order.PayMongoCheckoutUrl);
+
+                <a asp-action="Details"
+                   asp-route-id="@order.Id"
+                   class="qrder-card text-decoration-none text-reset d-block">
+                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                        <span class="fw-bold fs-5">Order #@order.Id</span>
+                        <span class="badge" style="@StatusBadgeStyle(order.Status)">
+                            @order.Status
+                        </span>
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 small text-muted mb-2">
+                        <span>@localDate.ToString("MMM dd, yyyy · hh:mm tt") (PHT)</span>
+                        <span class="fw-semibold">@order.PaymentMethod (@order.PaymentStatus)</span>
+                    </div>
+
+                    @if (isPendingMaya)
+                    {
+                        <div class="small fw-bold px-2 py-1 mb-2"
+                             style="background-color: #fff3cd; color: #664d03; border: 1.5px solid #664d03; border-radius: var(--qrder-radius, 4px);">
+                            @(hasOpenCheckout
+                                ? "Action needed: Tap to complete Online Checkout (via Maya)"
+                                : "Action needed: Online checkout cancelled — tap to retry or switch to Cash")
+                        </div>
+                    }
+
+                    <div class="d-flex justify-content-between align-items-center border-top pt-2">
+                        <span class="small fw-bold" style="color: var(--qrder-espresso);">
+                            View Order Slip &amp; Details &rarr;
+                        </span>
+                        <span class="fw-bold fs-6" style="color: var(--qrder-roast);">₱@order.TotalAmount.ToString("N2")</span>
+                    </div>
+                </a>
+            }
+        </div>
+    }
+</div>
+
+@if (hasActiveOrders)
+{
+    <script>
+        (() => {
+            const rootEl = document.getElementById("qrderMyOrdersRoot");
+            if (!rootEl) return;
+
+            const initialSig = rootEl.getAttribute("data-status-signature") || "";
+
+            async function pollMyOrders() {
+                if (document.hidden) return;
+                try {
+                    const response = await fetch(window.location.href, {
+                        headers: { "X-Requested-With": "XMLHttpRequest" },
+                        cache: "no-store"
+                    });
+                    if (!response.ok) return;
+
+                    const html = await response.text();
+                    const doc = new DOMParser().parseFromString(html, "text/html");
+                    const nextRoot = doc.getElementById("qrderMyOrdersRoot");
+                    if (!nextRoot) return;
+
+                    const nextSig = nextRoot.getAttribute("data-status-signature") || "";
+                    if (nextSig !== initialSig) {
+                        window.location.reload();
+                    }
+                } catch {
+                    // Retry silently on next tick
+                }
+            }
+
+            setInterval(pollMyOrders, 8000);
+        })();
+    </script>
 }

@@ -1,44 +1,110 @@
+@*
+    Views/Products/Index.cshtml
+    Menu Studio (PC Owner/Staff) & Digital Menu (Mobile Customer) for QRDER (Bean Crate Cafe):
+    - Orders both categories and products in the exact 11-page Bean Crate Cafe menu sequence.
+    - Displays 17 distinct bespoke SVG category icons tailored to each menu section.
+    - Preserves the live AJAX search endpoint (@Url.Action("Search")) into #productGrid.
+*@
+@using Microsoft.AspNetCore.Html
 @model IEnumerable<orderManagementSystem.Models.Product>
 
 @{
-    ViewData["Title"] = "Our Menu";
+    var isOwner = User.IsInRole("Owner");
+    var isStaff = isOwner || User.IsInRole("Employee");
+    ViewData["Title"] = isStaff ? "Menu Studio" : "Menu";
+
+    var productsList = Model.ToList();
+    var totalProducts = productsList.Count;
+    var availableProducts = productsList.Count(p => p.IsAvailable);
+    var unavailableProducts = productsList.Count(p => !p.IsAvailable);
+    var categoryCount = productsList
+        .Where(p => p.Category != null && !string.IsNullOrWhiteSpace(p.Category.Name))
+        .Select(p => p.Category!.Name.Trim())
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Count();
 }
 
 <style>
-    .menu-heading {
-        color: var(--bs-emphasis-color);
-        font-weight: 750;
-    }
-
     .menu-search {
         max-width: 520px;
     }
 
+    .category-pick-card {
+        border: 2px solid var(--qrder-border-strong, #2b1d16) !important;
+        border-radius: var(--qrder-radius, 4px);
+        background: var(--qrder-surface);
+        padding: 1.25rem 0.9rem;
+        text-align: center;
+        cursor: pointer;
+        box-shadow: 3px 3px 0px var(--qrder-shadow-color, #2b1d16);
+        transition: transform .14s ease, box-shadow .14s ease, background-color .14s ease;
+        height: 100%;
+    }
+
+    .category-pick-card:hover {
+        transform: translate(-1px, -1px);
+        background-color: var(--qrder-cream-soft);
+        box-shadow: 4px 4px 0px var(--qrder-shadow-color, #2b1d16);
+    }
+
+    .category-pick-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: var(--qrder-radius, 4px);
+        background-color: var(--qrder-cream-soft);
+        border: 2px solid var(--qrder-border-strong, #2b1d16);
+        color: #4A1C05;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .category-pick-icon svg {
+        width: 28px;
+        height: 28px;
+    }
+
     .product-card {
         height: 100%;
-        border: 1px solid var(--bs-border-color);
-        border-radius: 14px;
+        border: 2px solid var(--qrder-border-strong, #2b1d16);
+        border-radius: var(--qrder-radius, 4px);
         overflow: hidden;
-        background: var(--bs-tertiary-bg);
-        transition: transform .18s ease, box-shadow .18s ease;
+        background: var(--qrder-surface);
+        box-shadow: 3px 3px 0px var(--qrder-shadow-color, #2b1d16);
+        transition: transform .14s ease, box-shadow .14s ease;
     }
 
     .product-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 22px rgba(59, 41, 33, .10);
+        transform: translate(-1px, -1px);
+        box-shadow: 4px 4px 0px var(--qrder-shadow-color, #2b1d16);
+    }
+
+    .product-image-square {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        overflow: hidden;
+        background: var(--qrder-cream-soft);
+        border-bottom: 2px solid var(--qrder-border-strong, #2b1d16);
     }
 
     .product-image {
+        position: absolute;
+        inset: 0;
         width: 100%;
-        height: 210px;
+        height: 100%;
+        max-width: none;
         object-fit: cover;
-        background: var(--bs-secondary-bg);
+        object-position: center;
+        display: block;
     }
 
     .product-placeholder {
-        height: 210px;
-        background: var(--bs-secondary-bg);
-        color: var(--bs-secondary-color);
+        width: 100%;
+        height: 100%;
+        background: var(--qrder-cream-soft);
+        color: var(--qrder-muted);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -46,103 +112,450 @@
     }
 
     .product-name {
-        color: var(--bs-emphasis-color);
+        color: var(--qrder-ink);
         font-weight: 700;
     }
 
     .product-price {
-        color: var(--bs-emphasis-color);
+        color: var(--qrder-ink);
         font-weight: 700;
         font-size: 1.1rem;
     }
 
-    .menu-btn {
-        background: #3b2921;
-        color: white;
-        border: none;
+    .qrder-cart-sticky-bar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1035;
+        background-color: var(--qrder-espresso);
+        border-top: 2px solid #f6efe6;
+        color: #f6efe6;
+        padding: 0.75rem 1rem;
+        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.24);
     }
 
-    .menu-btn:hover {
-        background: #604536;
-        color: white;
-    }
-
-    [data-theme="dark"] .menu-btn {
-        background: #d5a66b;
-        color: #241a15;
-    }
-
-    [data-theme="dark"] .menu-btn:hover {
-        background: #e5bb89;
-        color: #241a15;
+    .qrder-cart-sticky-inner {
+        max-width: 960px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
     }
 
     @@media (hover: none) {
-        .product-card:hover {
+        .product-card:hover,
+        .category-pick-card:hover {
             transform: none;
-            box-shadow: none;
-        }
-    }
-
-    @@media (max-width: 575.98px) {
-        .product-image,
-        .product-placeholder {
-            height: 180px;
+            box-shadow: 3px 3px 0px var(--qrder-shadow-color, #2b1d16);
         }
     }
 </style>
 
-<div class="py-3 py-md-4">
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+@if (isStaff)
+{
+    var staffCategories = productsList
+        .GroupBy(p => string.IsNullOrWhiteSpace(p.Category?.Name) ? "Other" : p.Category!.Name.Trim())
+        .Select(g => new
+        {
+            Name = g.Key,
+            Count = g.Count(),
+            SortOrder = orderManagementSystem.Data.MenuSeeder.GetCategorySortOrder(g.Key)
+        })
+        .OrderBy(c => c.SortOrder)
+        .ThenBy(c => c.Name)
+        .ToList();
+
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
         <div>
-            <h1 class="menu-heading mb-1">Our Menu</h1>
-            <p class="text-muted mb-0">Find something you'll enjoy at Bean Crate.</p>
+            <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; BEAN CRATE CAFE</div>
+            <h1 class="qrder-page-title">Menu Studio</h1>
+            <p class="qrder-page-subtitle mb-0">
+                @(isOwner
+                    ? "Manage Bean Crate Cafe drinks, meals, pricing, options, and item availability."
+                    : "Browse available Bean Crate Cafe items, prices, and customization options.")
+            </p>
         </div>
 
-        @if (User.IsInRole("Owner"))
+        @if (isOwner)
         {
-            <a asp-action="Create" class="btn menu-btn w-100 w-sm-auto">
-                + Add Product
-            </a>
+            <div>
+                <a asp-action="Create"
+                   data-qrder-loading="Opening new product form..."
+                   class="btn menu-btn px-4 py-2 fw-semibold">
+                    + Add Product
+                </a>
+            </div>
         }
     </div>
 
-    <div class="menu-search mb-4">
-        <input id="productSearch"
-               class="form-control"
-               type="search"
-               placeholder="Search drinks, meals, and more..."
-               data-url="@Url.Action("Search")" />
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+                <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Total Menu Items</div>
+                <div class="fs-3 fw-bold qrder-tabular mt-1">@totalProducts</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+                <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Available Now</div>
+                <div class="fs-3 fw-bold qrder-tabular mt-1">@availableProducts</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+                <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Sold Out</div>
+                <div class="fs-3 fw-bold qrder-tabular mt-1">@unavailableProducts</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+                <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Categories</div>
+                <div class="fs-3 fw-bold qrder-tabular mt-1">@categoryCount</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="qrder-card mb-4">
+        <div class="menu-search mb-3">
+            <label for="productSearch" class="visually-hidden">Search menu items</label>
+            <input id="productSearch"
+                   class="form-control"
+                   type="search"
+                   placeholder="Search drinks, meals, and more..."
+                   data-url="@Url.Action("Search")" />
+        </div>
+
+        <div class="d-flex flex-wrap gap-2" id="staffCategoryFilterBar" role="group" aria-label="Filter menu by category">
+            <button type="button"
+                    class="btn btn-sm menu-btn px-3"
+                    data-staff-category="all">
+                All (@totalProducts)
+            </button>
+            @foreach (var cat in staffCategories)
+            {
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary px-3"
+                        data-staff-category="@cat.Name">
+                    @cat.Name (@cat.Count)
+                </button>
+            }
+        </div>
     </div>
 
     <div class="row g-4" id="productGrid">
         <partial name="_ProductRows" model="Model" />
     </div>
-</div>
+}
+else
+{
+    var categories = productsList
+        .GroupBy(p => string.IsNullOrWhiteSpace(p.Category?.Name) ? "Other" : p.Category!.Name.Trim())
+        .Select(g => new
+        {
+            Name = g.Key,
+            Count = g.Count(),
+            SortOrder = orderManagementSystem.Data.MenuSeeder.GetCategorySortOrder(g.Key)
+        })
+        .OrderBy(c => c.SortOrder)
+        .ThenBy(c => c.Name)
+        .ToList();
+
+    IHtmlContent RenderCategorySvg(string name)
+    {
+        var key = name.Trim().ToLowerInvariant();
+        string inner = key switch
+        {
+            "coffee" => "<path d='M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V9z'/><path d='M16 10h2a2 2 0 0 1 0 4h-2'/><path d='M8 4c0 1.5 1 2 1 3M12 4c0 1.5 1 2 1 3' stroke='#C05800'/>",
+            "non-coffee" => "<path d='M7 7h10l-1 13H8L7 7z'/><path d='M6 7h12'/><path d='M14 3l-2 4' stroke='#C05800'/><path d='M7.5 13h9' stroke='#C05800'/>",
+            "pasta" => "<path d='M4 13h16a8 8 0 0 1-16 0z'/><path d='M6 10c2-2 4 2 6 0s4 2 6 0' stroke='#C05800'/><path d='M5 6h14'/>",
+            "sandwiches" => "<path d='M4 10a8 5 0 0 1 16 0H4z'/><path d='M3 13h18' stroke='#C05800' stroke-width='2.2'/><path d='M5 16h14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z'/>",
+            "snacks" => "<path d='M6 10h12l-1.5 10h-9L6 10z'/><path d='M8 10V5M11 10V4M14 10V5M16 10V6' stroke='#C05800'/>",
+            "juices & lemonades" => "<path d='M7 8h10l-1.2 12H8.2L7 8z'/><circle cx='16' cy='7' r='3.5' stroke='#C05800'/><path d='M10 4l1.5 4'/>",
+            "house blend" => "<path d='M7 6h9l-1 14H8L7 6z'/><path d='M16 9h2a2 2 0 0 1 0 5h-2'/><path d='M11 11c2-2 4 0 3 2s-3 2-3 0z' stroke='#C05800'/>",
+            "lemon soda" => "<path d='M7 7h10l-1 13H8L7 7z'/><circle cx='11' cy='12' r='1' fill='#C05800'/><circle cx='14' cy='15' r='1.2' fill='#C05800'/><circle cx='10' cy='16' r='0.9' fill='#C05800'/><path d='M15 3l-2 4' stroke='#C05800'/>",
+            "thai series & floats" => "<path d='M7 10h10l-1 10H8L7 10z'/><path d='M8 10a4 4 0 0 1 8 0' stroke='#C05800'/><path d='M15 4l-2 5' stroke='#C05800'/>",
+            "parfait series" => "<path d='M7 9h10l-2 9H9L7 9z'/><path d='M9 20h6M12 18v2'/><path d='M8 9a4 3.5 0 0 1 8 0' stroke='#C05800'/><circle cx='12' cy='4.5' r='1.3' fill='#C05800'/>",
+            "specialty drinks" => "<path d='M7 9h10l-1 11H8L7 9z'/><path d='M6 7l3-3 3 2.5L15 4l3 3' stroke='#C05800'/>",
+            "desserts & banana pudding" => "<path d='M5 13h14l-1.5 6h-11L5 13z'/><path d='M7 13a5 4 0 0 1 10 0' stroke='#C05800'/><circle cx='12' cy='7.5' r='1.3' fill='#C05800'/>",
+            "buldak series" => "<path d='M4 12h16a8 7 0 0 1-16 0z'/><path d='M5 7l14-2M5 9l14-1' stroke='#C05800'/><path d='M12 15c1.5-1.5 1.5-3 0-4-1.5 1-1.5 2.5 0 4z' fill='#C05800'/>",
+            "matcha foam series" => "<path d='M7 7h10l-1 13H8L7 7z'/><path d='M7.3 10.5h9.4' stroke='#C05800' stroke-width='2.4'/><path d='M14 3l-1.5 4'/>",
+            "ube series" => "<path d='M7 7h10l-1 13H8L7 7z'/><path d='M8 15c2-1.5 2 1.5 4 0s2 1.5 4 0' stroke='#C05800'/><path d='M14 3l-1.5 4'/>",
+            "pistachio series" => "<path d='M7 8h10l-1 12H8L7 8z'/><ellipse cx='12' cy='5' rx='3' ry='1.8' stroke='#C05800'/><path d='M7.4 11h9.2' stroke='#C05800'/>",
+            "rice bowls" => "<path d='M4 12h16a8 7 0 0 1-16 0z'/><path d='M6 12a6 4 0 0 1 12 0' stroke='#C05800'/><path d='M8 20h8'/>",
+            _ => "<path d='M7 7h10l-1 13H8L7 7z'/><path d='M14 3l-2 4' stroke='#C05800'/>"
+        };
+
+        return new HtmlString($"<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\">{inner}</svg>");
+    }
+
+    <div class="mb-3">
+        <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; BEAN CRATE CAFE</div>
+        <h1 class="h3 fw-bold mb-1">Our Menu</h1>
+        <p class="text-muted small mb-0">Choose a category below to browse items and add them to your order.</p>
+    </div>
+
+    @if (ViewBag.CurrentCustomer is orderManagementSystem.Models.Customer activeCustomer)
+    {
+        <div class="qrder-telemetry-strip mb-3">
+            <div class="d-flex align-items-center gap-2">
+                <span class="qrder-beacon" aria-hidden="true"></span>
+                <span>ACTIVE SESSION: @activeCustomer.DisplayName</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a asp-controller="Home"
+                   asp-action="Index"
+                   data-qrder-loading="Loading session controls..."
+                   class="btn btn-sm py-0 px-2 fw-bold"
+                   style="background-color: var(--qrder-cream-soft); color: #2b1d16; border: 1.5px solid #f6efe6; font-size: 0.74rem;">
+                    Edit Session
+                </a>
+                <a asp-controller="Orders"
+                   asp-action="MyOrders"
+                   data-qrder-loading="Loading your orders..."
+                   class="btn btn-sm py-0 px-2 fw-bold"
+                   style="background-color: var(--qrder-amber); color: #ffffff; border: 1.5px solid #f6efe6; font-size: 0.74rem;">
+                    My Orders
+                </a>
+            </div>
+        </div>
+    }
+
+    @if (TempData["AddedToOrderNotice"] is string addedNotice)
+    {
+        <div class="alert alert-success d-flex align-items-center justify-content-between py-2 px-3 mb-3" role="status">
+            <span class="small fw-semibold">&#10003; @addedNotice</span>
+            <a asp-controller="Orders" asp-action="Create" class="btn btn-sm btn-success fw-semibold">
+                Checkout
+            </a>
+        </div>
+    }
+
+    <div class="qrder-card mb-4">
+        <div class="menu-search w-100" style="max-width: 100%;">
+            <label for="productSearch" class="visually-hidden">Search menu items</label>
+            <input id="productSearch"
+                   class="form-control"
+                   type="search"
+                   placeholder="Search all drinks, meals, and desserts..."
+                   data-url="@Url.Action("Search")" />
+        </div>
+    </div>
+
+    @* Step 1: Category & Icon Picker (ordered by Bean Crate Cafe's 11-page menu) *@
+    <div id="categoryPickerSection" class="mb-4">
+        <div class="small text-muted fw-semibold text-uppercase mb-2" style="letter-spacing: 0.08em;">
+            Select a Category
+        </div>
+        <div class="row g-3">
+            @foreach (var cat in categories)
+            {
+                <div class="col-6 col-md-4 col-lg-3">
+                    <button type="button"
+                            class="category-pick-card w-100 border-1"
+                            data-pick-category="@cat.Name">
+                        <div class="category-pick-icon">@RenderCategorySvg(cat.Name)</div>
+                        <div class="fw-bold text-dark">@cat.Name</div>
+                        <div class="small text-muted mt-1">@cat.Count item(s)</div>
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* Step 2: Filtered Product Grid (hidden until a category is chosen or a search is typed) *@
+    <div id="categoryProductsSection" class="d-none">
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+            <button type="button" id="backToCategoriesBtn" class="btn btn-sm btn-outline-secondary px-3">
+                &larr; All Categories
+            </button>
+            <span class="fw-bold" id="activeCategoryHeading"></span>
+        </div>
+
+        <div class="row g-4" id="productGrid">
+            <partial name="_ProductRows" model="Model" />
+        </div>
+    </div>
+
+    @* Sticky Bottom Order Cart Bar (clickable to proceed to checkout) *@
+    <a id="qrderCartFooter"
+       asp-controller="Orders"
+       asp-action="Create"
+       data-qrder-loading="Opening order checkout..."
+       class="qrder-cart-sticky-bar text-decoration-none d-none">
+        <div class="qrder-cart-sticky-inner">
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge"
+                      id="qrderCartCountBadge"
+                      style="background-color: #C05800; color: #fffaf3; border: 1.5px solid #f6efe6; font-size: 0.85rem;">
+                    0
+                </span>
+                <span class="fw-bold small" id="qrderCartLabel">items in your order</span>
+            </div>
+            <span class="btn btn-sm fw-bold px-3"
+                  style="background-color: #ede0c9; color: #2b1d16; border: 2px solid #f6efe6; border-radius: var(--qrder-radius, 4px); box-shadow: 2px 2px 0px #000000;">
+                Proceed to Checkout &rarr;
+            </span>
+        </div>
+    </a>
+}
 
 @section Scripts {
     <script>
         (() => {
             const input = document.getElementById('productSearch');
             const grid = document.getElementById('productGrid');
+            const categoryPicker = document.getElementById('categoryPickerSection');
+            const categoryProducts = document.getElementById('categoryProductsSection');
+            const backBtn = document.getElementById('backToCategoriesBtn');
+            const headingEl = document.getElementById('activeCategoryHeading');
+            const staffFilterBtns = document.querySelectorAll('[data-staff-category]');
+            const isCustomerView = Boolean(categoryPicker && categoryProducts);
+
+            let selectedCategory = null;
+            let activeStaffCategory = 'all';
             let timer;
             let request;
+
+            // Defer downloading 101 product images on Customer menu until a category or search opens
+            if (isCustomerView && grid) {
+                grid.querySelectorAll('img[src]').forEach(img => {
+                    const src = img.getAttribute('src');
+                    if (src) {
+                        img.setAttribute('data-deferred-src', src);
+                        img.setAttribute('decoding', 'async');
+                        img.removeAttribute('src');
+                    }
+                });
+            }
+
+            function activateCardImages(containerEl) {
+                if (!containerEl) return;
+                containerEl.querySelectorAll('img[data-deferred-src]').forEach(img => {
+                    const deferred = img.getAttribute('data-deferred-src');
+                    if (deferred) {
+                        img.setAttribute('src', deferred);
+                        img.removeAttribute('data-deferred-src');
+                    }
+                });
+            }
+
+            function filterGridByCategory(categoryName) {
+                if (!grid) return;
+                const cards = grid.querySelectorAll('[data-product-col]');
+                cards.forEach(col => {
+                    const itemCat = col.getAttribute('data-category') || 'Other';
+                    const show = !categoryName || categoryName === 'all' || itemCat.toLowerCase() === categoryName.toLowerCase();
+                    col.classList.toggle('d-none', !show);
+                    if (show) {
+                        activateCardImages(col);
+                    }
+                });
+            }
+
+            staffFilterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    activeStaffCategory = btn.getAttribute('data-staff-category') || 'all';
+                    staffFilterBtns.forEach(b => {
+                        b.classList.remove('menu-btn');
+                        b.classList.add('btn-outline-secondary');
+                    });
+                    btn.classList.remove('btn-outline-secondary');
+                    btn.classList.add('menu-btn');
+                    filterGridByCategory(activeStaffCategory);
+                });
+            });
+
+            function openCategory(categoryName) {
+                selectedCategory = categoryName;
+                if (headingEl) headingEl.textContent = categoryName;
+                filterGridByCategory(categoryName);
+                categoryPicker?.classList.add('d-none');
+                categoryProducts?.classList.remove('d-none');
+            }
+
+            function showAllCategories() {
+                selectedCategory = null;
+                if (input) input.value = '';
+                categoryProducts?.classList.add('d-none');
+                categoryPicker?.classList.remove('d-none');
+            }
+
+            document.querySelectorAll('[data-pick-category]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    openCategory(btn.getAttribute('data-pick-category'));
+                });
+            });
+
+            backBtn?.addEventListener('click', showAllCategories);
+
+            // Sync sticky checkout footer with session cart
+            function refreshStickyCartBar() {
+                const bar = document.getElementById('qrderCartFooter');
+                const badge = document.getElementById('qrderCartCountBadge');
+                const label = document.getElementById('qrderCartLabel');
+                if (!bar || !badge || !label) return;
+
+                try {
+                    const raw = sessionStorage.getItem('qrder_customer_cart');
+                    const items = raw ? JSON.parse(raw) : [];
+                    const totalQty = Array.isArray(items)
+                        ? items.reduce((sum, item) => sum + (Number(item.Quantity) || 1), 0)
+                        : 0;
+
+                    if (totalQty > 0) {
+                        badge.textContent = String(totalQty);
+                        label.textContent = totalQty === 1 ? 'item in your order' : 'items in your order';
+                        bar.classList.remove('d-none');
+                        document.body.style.paddingBottom = '64px';
+                    } else {
+                        bar.classList.add('d-none');
+                    }
+                } catch {
+                    bar.classList.add('d-none');
+                }
+            }
+
+            refreshStickyCartBar();
+
+            if (!input || !grid) {
+                return;
+            }
 
             input.addEventListener('input', () => {
                 clearTimeout(timer);
 
                 timer = setTimeout(async () => {
+                    const term = input.value.trim();
+
+                    if (isCustomerView && term.length === 0) {
+                        if (selectedCategory) {
+                            openCategory(selectedCategory);
+                        } else {
+                            showAllCategories();
+                        }
+                        return;
+                    }
+
                     request?.abort();
                     request = new AbortController();
 
                     try {
                         const response = await fetch(
-                            input.dataset.url + '?term=' + encodeURIComponent(input.value),
+                            input.dataset.url + '?term=' + encodeURIComponent(term),
                             { signal: request.signal }
                         );
 
                         if (response.ok) {
                             grid.innerHTML = await response.text();
+                            if (isCustomerView) {
+                                if (headingEl) headingEl.textContent = `Search results for "${term}"`;
+                                categoryPicker?.classList.add('d-none');
+                                categoryProducts?.classList.remove('d-none');
+                            } else {
+                                filterGridByCategory(activeStaffCategory);
+                            }
                         }
                     } catch (error) {
                         if (error.name !== 'AbortError') {

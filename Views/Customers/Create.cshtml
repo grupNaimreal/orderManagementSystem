@@ -1,14 +1,77 @@
+@*
+    Views/Customers/Create.cshtml
+    Staff / Owner POS form to create a new walk-in or table customer session
+    and return immediately to the counter order builder.
+*@
 @model orderManagementSystem.Models.Customer
-@{ ViewData["Title"] = "Create Customer Session"; }
-<h1>Create Customer Session</h1>
-<form asp-action="Create" method="post">
-    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-    <div class="mb-3">
-        <label asp-for="DisplayName" class="form-label"></label>
-        <input asp-for="DisplayName" class="form-control" maxlength="30" />
-        <span asp-validation-for="DisplayName" class="text-danger"></span>
+
+@{
+    ViewData["Title"] = "New Customer Session";
+}
+
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-4">
+    <div>
+        <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; COUNTER POS</div>
+        <h1 class="qrder-page-title mb-1">New Customer Session</h1>
+        <p class="qrder-page-subtitle mb-0">
+            Register a walk-in guest or table label so you can attach counter orders to their session.
+        </p>
     </div>
-    <button type="submit" class="btn btn-primary">Create</button>
-    <a asp-controller="Products" asp-action="Index" class="btn btn-secondary">Cancel</a>
-</form>
-@section Scripts { <partial name="_ValidationScriptsPartial" /> }
+
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-controller="Orders" asp-action="CreateForCustomer" class="btn btn-outline-secondary btn-sm px-3">
+            &larr; Back to New Order
+        </a>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm px-3">
+            All Sessions
+        </a>
+    </div>
+</div>
+
+<div class="mx-auto" style="max-width: 520px;">
+    <div class="qrder-card">
+        <form asp-action="Create" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+
+            <div class="mb-3">
+                <label for="tableLabel" class="form-label small fw-semibold">
+                    Table / Order Type <span class="text-muted fw-normal">(Optional)</span>
+                </label>
+                <input type="text"
+                       id="tableLabel"
+                       name="tableLabel"
+                       maxlength="15"
+                       class="form-control"
+                       placeholder="e.g., Table 1, Take-Out, or Walk-In" />
+            </div>
+
+            <div class="mb-4">
+                <label asp-for="DisplayName" class="form-label small fw-semibold">Customer Name</label>
+                <input asp-for="DisplayName"
+                       class="form-control"
+                       minlength="2"
+                       maxlength="30"
+                       required
+                       autofocus
+                       placeholder="e.g., Walker" />
+                <div class="form-text small">
+                    2&ndash;30 characters. Active sessions stay open for 10 minutes between actions.
+                </div>
+                <span asp-validation-for="DisplayName" class="text-danger small"></span>
+            </div>
+
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn menu-btn py-2 fw-semibold">
+                    Create Session &amp; Return to Order
+                </button>
+                <a asp-controller="Orders" asp-action="CreateForCustomer" class="btn btn-outline-secondary py-2">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

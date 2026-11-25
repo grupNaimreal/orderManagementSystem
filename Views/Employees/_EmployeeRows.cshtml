@@ -1,22 +1,108 @@
+@*
+    Views/Employees/_EmployeeRows.cshtml
+    Shared staff table rows rendered in Views/Employees/Index.cshtml and returned by EmployeesController.Search.
+    - Uses Neo-Industrial stamp badges for Role and Active/Deactivated status with full Dark Mode contrast.
+    - Renders tactile btn-sm action controls aligned cleanly across desktop, tablet, and stacked mobile cards.
+*@
 @model IEnumerable<orderManagementSystem.Models.StaffRowViewModel>
-@foreach (var item in Model)
+
+@if (!Model.Any())
 {
     <tr>
-        <td data-label="Name">@item.Name</td>
-        <td data-label="Employee Code">@(string.IsNullOrWhiteSpace(item.EmployeeCode) ? "Not provided" : item.EmployeeCode)</td>
-        <td data-label="Email">@item.Email</td>
-        <td data-label="Role">@item.Role</td>
-        <td data-label="Status">@(item.IsActive ? "Active" : "Deactivated")</td>
-        <td data-label="Actions">
-            <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
-            <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
-            <a asp-action="ResetPassword" asp-route-id="@item.Id">Reset password</a>
-            @if (item.IsActive)
-            {
-                <form asp-action="Deactivate" asp-route-id="@item.Id" method="post" class="d-inline">
-                    <button type="submit" class="btn btn-link p-0">Deactivate</button>
-                </form>
-            }
+        <td colspan="6" class="text-center text-muted small py-4">
+            No staff accounts found.
         </td>
     </tr>
+}
+else
+{
+    foreach (var item in Model)
+    {
+        var isOwnerRole = string.Equals(item.Role, "Owner", StringComparison.OrdinalIgnoreCase);
+
+        <tr data-status="@(item.IsActive ? "active" : "inactive")">
+            <td data-label="Name" class="fw-bold">
+                @item.Name
+            </td>
+            <td data-label="Employee Code" class="qrder-tabular text-nowrap">
+                @if (string.IsNullOrWhiteSpace(item.EmployeeCode))
+                {
+                    <span class="text-muted small fst-italic">Not provided</span>
+                }
+                else
+                {
+                    <span class="badge"
+                          style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1.5px solid var(--qrder-border-strong);">
+                        @item.EmployeeCode
+                    </span>
+                }
+            </td>
+            <td data-label="Email" class="small">
+                @item.Email
+            </td>
+            <td data-label="Role" class="text-nowrap">
+                @if (isOwnerRole)
+                {
+                    <span class="badge"
+                          style="background-color: var(--qrder-espresso); color: #f6efe6; border: 1.5px solid var(--qrder-border-strong);">
+                        @item.Role
+                    </span>
+                }
+                else
+                {
+                    <span class="badge"
+                          style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1.5px solid var(--qrder-border-strong);">
+                        @item.Role
+                    </span>
+                }
+            </td>
+            <td data-label="Status" class="text-nowrap">
+                @if (item.IsActive)
+                {
+                    <span class="badge"
+                          style="background-color: #d1e7dd; color: #0f5132; border: 1.5px solid #0f5132;">
+                        Active
+                    </span>
+                }
+                else
+                {
+                    <span class="badge"
+                          style="background-color: #f8d7da; color: #842029; border: 1.5px solid #842029;">
+                        Deactivated
+                    </span>
+                }
+            </td>
+            <td data-label="Actions" class="text-end text-nowrap">
+                <div class="d-inline-flex flex-wrap justify-content-end gap-1">
+                    <a asp-action="Details"
+                       asp-route-id="@item.Id"
+                       class="btn btn-sm btn-outline-secondary px-2 py-1">
+                        Details
+                    </a>
+                    <a asp-action="Edit"
+                       asp-route-id="@item.Id"
+                       class="btn btn-sm btn-outline-secondary px-2 py-1">
+                        Edit
+                    </a>
+                    <a asp-action="ResetPassword"
+                       asp-route-id="@item.Id"
+                       class="btn btn-sm btn-outline-secondary px-2 py-1">
+                        Password
+                    </a>
+                    @if (item.IsActive)
+                    {
+                        <form asp-action="Deactivate"
+                              asp-route-id="@item.Id"
+                              method="post"
+                              class="d-inline"
+                              onsubmit="return confirm('Deactivate staff account for @item.Name? They will immediately lose POS login access.');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger px-2 py-1">
+                                Deactivate
+                            </button>
+                        </form>
+                    }
+                </div>
+            </td>
+        </tr>
+    }
 }

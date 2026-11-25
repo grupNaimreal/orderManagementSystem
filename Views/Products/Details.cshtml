@@ -1,93 +1,469 @@
+@*
+    Views/Products/Details.cshtml
+    Item Customization & Add-to-Order screen for QRDER (Bean Crate Cafe):
+    - Roastery Press / Espresso Ticket editorial-brutalist framing with 2px ink borders
+      and hard offset espresso shadows.
+    - Resolves product images via MenuSeeder.ResolveProductImageUrl (.png/.jpg/.jpeg/.webp, case-insensitive)
+      with a color-matched category fallback card.
+    - Displays Variants sorted by price adjustment, collapsible Add-ons (cheapest first),
+      quantity controls, and an "Add to Order" action that shows a clean auto-redirecting
+      "Added to Order!" popup without redundant navigation buttons.
+*@
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment WebEnv
 @model orderManagementSystem.Models.Product
+
 @{
-    ViewData["Title"] = "Product Details";
+    var isOwner = User.IsInRole("Owner");
+    var isStaff = isOwner || User.IsInRole("Employee");
+    ViewData["Title"] = Model.Name;
+
+    var variants = Model.Options
+        .Where(o => o.IsAvailable && o.OptionType == "Variant")
+        .OrderBy(o => o.PriceAdjustment)
+        .ThenBy(o => o.Name)
+        .ToList();
+
+    var addOns = Model.Options
+        .Where(o => o.IsAvailable && o.OptionType == "AddOn")
+        .OrderBy(o => o.PriceAdjustment)
+        .ThenBy(o => o.Name)
+        .ToList();
+
+    var categoryName = string.IsNullOrWhiteSpace(Model.Category?.Name) ? "Menu Item" : Model.Category!.Name.Trim();
+    var resolvedImageUrl = orderManagementSystem.Data.MenuSeeder.ResolveProductImageUrl(
+        Model.ImageUrl,
+        Model.Name,
+        WebEnv.WebRootPath);
+
+    var (bgGradient, accentColor) = categoryName.ToLowerInvariant() switch
+    {
+        "matcha foam series" => ("linear-gradient(135deg, #e5efe0 0%, #c9dec0 100%)", "#2D5224"),
+        "ube series" => ("linear-gradient(135deg, #ece3f5 0%, #d5c2ea 100%)", "#4B2673"),
+        "pistachio series" => ("linear-gradient(135deg, #e9efe1 0%, #d1dec1 100%)", "#3F5723"),
+        "buldak series" => ("linear-gradient(135deg, #fbe0dc 0%, #f2b8af 100%)", "#8F1D14"),
+        "parfait series" or "specialty drinks" => ("linear-gradient(135deg, #fae3e8 0%, #f1c5d0 100%)", "#7A223B"),
+        "juices & lemonades" or "snacks" => ("linear-gradient(135deg, #fcf6d8 0%, #f4e69c 100%)", "#6E5800"),
+        "lemon soda" => ("linear-gradient(135deg, #e7f4f8 0%, #cde7f0 100%)", "#1D5B72"),
+        _ => ("linear-gradient(135deg, #f3e5d8 0%, #e4ccb6 100%)", "#4A1C05")
+    };
 }
 
-<h1>@Model.Name</h1>
-<dl class="row">
-    <dt class="col-sm-3">Category</dt>
-    <dd class="col-sm-9">@Model.Category?.Name</dd>
-    <dt class="col-sm-3">Description</dt>
-    <dd class="col-sm-9">@Model.Description</dd>
-    <dt class="col-sm-3">Price</dt>
-    <dd class="col-sm-9">@Model.Price.ToString("N2")</dd>
-    <dt class="col-sm-3">Availability</dt>
-    <dd class="col-sm-9">@(Model.IsAvailable ? "Available" : "Unavailable")</dd>
-    @if (!string.IsNullOrWhiteSpace(Model.ImageUrl))
-    {
-        <dt class="col-sm-3">Image</dt>
-        <dd class="col-sm-9">
-            <img src="@Model.ImageUrl" alt="@Model.Name" class="img-fluid rounded" style="max-width:240px;max-height:180px" />
-        </dd>
+<style>
+    .detail-square-img-wrap {
+        position: relative;
+        width: 100%;
+        max-width: 290px;
+        aspect-ratio: 1 / 1;
+        border-radius: var(--qrder-radius, 4px);
+        overflow: hidden;
+        background-color: var(--qrder-cream-soft);
+        border: 2px solid var(--qrder-border-strong, #2b1d16);
+        box-shadow: 5px 5px 0px var(--qrder-shadow-color, #2b1d16);
+        margin: 0 auto;
     }
-</dl>
-<h2>Variants and Add-ons</h2>
-<div class="table-responsive">
-    <table class="table table-striped stack-table">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Price Adjustment</th>
-                <th>Available</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-        @foreach (var option in Model.Options.OrderBy(o => o.OptionType).ThenBy(o => o.Name))
-        {
-            <tr>
-                <td data-label="Name">@option.Name</td>
-                <td data-label="Type">@option.OptionType</td>
-                <td data-label="Price Adjustment">@option.PriceAdjustment.ToString("N2")</td>
-                <td data-label="Available">@(option.IsAvailable ? "Yes" : "No")</td>
-                <td data-label="Actions">
-                    @if (User.IsInRole("Owner"))
-                    {
-                        <a asp-action="EditOption" asp-route-id="@option.Id">Edit</a>
-                        <form asp-action="DeleteOption" asp-route-id="@option.Id" method="post" class="d-inline">
-                            <button class="btn btn-link p-0" type="submit">Delete</button>
-                        </form>
-                    }
-                </td>
-            </tr>
-        }
-        </tbody>
-    </table>
-</div>
-@if (User.IsInRole("Owner"))
-{
-    <h3>Add Variant / Add-on</h3>
-    @if (TempData["OptionError"] != null)
-    {
-        <p class="text-danger">@TempData["OptionError"]</p>
-    }
-    <form asp-action="AddOption" method="post">
-        <input type="hidden" name="ProductId" value="@Model.Id" />
-        <div class="mb-2"><label for="optionName">Name</label><input id="optionName" name="Name" class="form-control" required maxlength="80" /></div>
-        <div class="mb-2"><label for="optionType">Type</label><select id="optionType" name="OptionType" class="form-select"><option>Variant</option><option>AddOn</option></select></div>
-        <div class="mb-2"><label for="priceAdjustment">Price adjustment</label><input id="priceAdjustment" name="PriceAdjustment" type="number" step="0.01" value="0" class="form-control" /></div>
-        <div class="form-check mb-3"><input id="optionAvailable" name="IsAvailable" type="checkbox" value="true" checked class="form-check-input" /><input name="IsAvailable" type="hidden" value="false" /><label for="optionAvailable">Available</label></div>
-        <button class="btn btn-primary w-100 w-sm-auto" type="submit">Add Option</button>
-    </form>
-}
-@if (User.IsInRole("Owner"))
-{
-    <form asp-action="SetAvailability" method="post" class="mt-3">
-        <input type="hidden" name="id" value="@Model.Id" />
-        <input type="hidden" name="isAvailable" value="@(!Model.IsAvailable)" />
-        <button class="btn btn-outline-primary w-100 w-sm-auto" type="submit">
-            Mark @(Model.IsAvailable ? "Unavailable" : "Available")
-        </button>
-    </form>
 
-    <a asp-action="Edit"
-       asp-route-id="@Model.Id"
-       class="btn btn-secondary mt-3 w-100 w-sm-auto">
-        Edit Product
+    .detail-square-img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        object-fit: cover;
+        object-position: center;
+        display: block;
+    }
+
+    .qrder-addon-accordion {
+        border: 2px solid var(--qrder-border-strong, #2b1d16);
+        border-radius: var(--qrder-radius, 4px);
+        background-color: var(--qrder-cream-soft);
+        padding: 0.6rem 0.85rem;
+    }
+
+    .qrder-qty-stepper {
+        max-width: 175px;
+    }
+
+    .qrder-qty-stepper .btn {
+        min-width: 44px;
+        min-height: 44px;
+        font-size: 1.1rem;
+    }
+
+    .qrder-added-popup-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(24, 15, 11, 0.62);
+        backdrop-filter: blur(2px);
+        z-index: 1060;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    .qrder-added-popup-card {
+        background: var(--qrder-surface);
+        color: var(--qrder-ink);
+        border: 2px solid var(--qrder-border-strong, #2b1d16);
+        border-radius: var(--qrder-radius, 4px);
+        max-width: 340px;
+        width: 100%;
+        padding: 1.75rem 1.5rem;
+        text-align: center;
+        box-shadow: 6px 6px 0px var(--qrder-shadow-color, #2b1d16);
+    }
+
+    .qrder-added-check {
+        width: 54px;
+        height: 54px;
+        border-radius: var(--qrder-radius, 4px);
+        background-color: #d1e7dd;
+        color: #0f5132;
+        border: 2px solid #0f5132;
+        box-shadow: 3px 3px 0px #0f5132;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.55rem;
+        font-weight: 800;
+        margin-bottom: 0.95rem;
+    }
+</style>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <a asp-action="Index" class="btn btn-sm btn-outline-secondary px-3">
+        &larr; Back to @(isStaff ? "Menu Studio" : "Menu")
     </a>
-}
 
-<a asp-action="Index" class="btn btn-secondary mt-3 w-100 w-sm-auto">
-    Back to Products
-</a>
+    @if (isOwner)
+    {
+        <div class="d-flex gap-2">
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-sm menu-btn px-3 fw-semibold">
+                Edit Product
+            </a>
+        </div>
+    }
+</div>
+
+<div class="mx-auto" style="max-width: 780px;">
+    <div class="qrder-card mb-4">
+        <div class="row g-4 align-items-center">
+            <div class="col-md-5">
+                <div class="detail-square-img-wrap">
+                    <img src="@resolvedImageUrl"
+                         alt="@Model.Name"
+                         class="detail-square-img"
+                         onerror="this.style.display='none'; this.nextElementSibling.classList.remove('d-none');" />
+                    <div class="d-none w-100 h-100 d-flex flex-column align-items-center justify-content-center p-3 text-center"
+                         style="background: @bgGradient; color: @accentColor;">
+                        <span class="badge mb-2" style="background: rgba(255,255,255,0.85); color: @accentColor; border: 1.5px solid @accentColor;">
+                            @categoryName
+                        </span>
+                        <span class="fw-bold fs-6">@Model.Name</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-7">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="badge"
+                          style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1.5px solid var(--qrder-border-strong);">
+                        @categoryName
+                    </span>
+                    @if (Model.IsAvailable)
+                    {
+                        <span class="badge"
+                              style="background-color: #d1e7dd; color: #0f5132; border: 1.5px solid #0f5132;">
+                            Available
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge"
+                              style="background-color: #f8d7da; color: #842029; border: 1.5px solid #842029;">
+                            Unavailable / Sold Out
+                        </span>
+                    }
+                </div>
+
+                <h1 class="h3 fw-bold mb-1">@Model.Name</h1>
+
+                <div class="d-flex align-items-baseline gap-2 mb-2">
+                    <span class="fs-3 fw-bold" style="color: var(--qrder-roast);" id="liveItemTotalPrice">₱@Model.Price.ToString("N2")</span>
+                    <span class="small text-muted fst-italic">Base price: ₱@Model.Price.ToString("N2")</span>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(Model.Description))
+                {
+                    <p class="text-muted small mb-0">@Model.Description</p>
+                }
+
+                <hr class="qrder-ticket-divider" />
+
+                @if (!isStaff)
+                {
+                    if (!Model.IsAvailable)
+                    {
+                        <div class="alert alert-warning small mb-0">
+                            This item is currently sold out. Please choose another item from the menu.
+                        </div>
+                    }
+                    else
+                    {
+                        if (variants.Any())
+                        {
+                            <div class="mb-3">
+                                <label for="variantSelect" class="form-label small fw-bold text-uppercase mb-1" style="letter-spacing: 0.06em;">
+                                    Size / Variant
+                                </label>
+                                <select id="variantSelect" class="form-select">
+                                    @foreach (var v in variants)
+                                    {
+                                        var sign = v.PriceAdjustment >= 0 ? "+" : "";
+                                        <option value="@v.Id" data-adj="@v.PriceAdjustment.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                                            @v.Name (@sign₱@v.PriceAdjustment.ToString("N2"))
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+                        }
+
+                        if (addOns.Any())
+                        {
+                            <details class="qrder-addon-accordion mb-3">
+                                <summary class="small fw-bold" style="cursor: pointer;">
+                                    Optional Add-ons (Cheapest First)
+                                    <span class="text-muted fw-normal fst-italic">&middot; View @addOns.Count optional add-on(s)</span>
+                                </summary>
+                                <div class="pt-2 mt-2 border-top d-flex flex-column gap-2" id="addOnsContainer">
+                                    @foreach (var addOn in addOns)
+                                    {
+                                        var sign = addOn.PriceAdjustment >= 0 ? "+" : "";
+                                        <div class="form-check mb-0">
+                                            <input class="form-check-input addon-checkbox"
+                                                   type="checkbox"
+                                                   value="@addOn.Id"
+                                                   data-adj="@addOn.PriceAdjustment.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                                   id="addon_@addOn.Id" />
+                                            <label class="form-check-label small" for="addon_@addOn.Id">
+                                                @addOn.Name (@sign₱@addOn.PriceAdjustment.ToString("N2"))
+                                            </label>
+                                        </div>
+                                    }
+                                </div>
+                            </details>
+                        }
+
+                        <div class="mb-3">
+                            <label for="quantityInput" class="form-label small fw-bold text-uppercase mb-1" style="letter-spacing: 0.06em;">Quantity</label>
+                            <div class="input-group qrder-qty-stepper">
+                                <button type="button" class="btn btn-outline-secondary" id="qtyMinusBtn" aria-label="Decrease quantity">&minus;</button>
+                                <input type="number"
+                                       id="quantityInput"
+                                       class="form-control text-center fw-bold"
+                                       value="1"
+                                       min="1"
+                                       max="99" />
+                                <button type="button" class="btn btn-outline-secondary" id="qtyPlusBtn" aria-label="Increase quantity">&#43;</button>
+                            </div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="button" id="addToOrderBtn" class="btn menu-btn py-2 fw-bold">
+                                Add to Order &mdash; ₱@Model.Price.ToString("N2")
+                            </button>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (isStaff)
+    {
+        <div class="qrder-card">
+            <div class="qrder-eyebrow">MENU CONFIGURATION</div>
+            <h2 class="h5 fw-bold mb-3">Available Variants &amp; Add-ons</h2>
+
+            @if (!Model.Options.Any())
+            {
+                <p class="text-muted small mb-0">No variants or add-ons configured for this item.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Option Name</th>
+                                <th>Type</th>
+                                <th class="text-end">Price Adjustment</th>
+                                <th class="text-end">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var opt in Model.Options.OrderBy(o => o.OptionType).ThenBy(o => o.PriceAdjustment).ThenBy(o => o.Name))
+                            {
+                                var sign = opt.PriceAdjustment >= 0 ? "+" : "";
+                                <tr>
+                                    <td class="fw-semibold">@opt.Name</td>
+                                    <td class="small">@opt.OptionType</td>
+                                    <td class="text-end">@sign₱@opt.PriceAdjustment.ToString("N2")</td>
+                                    <td class="text-end">
+                                        @if (opt.IsAvailable)
+                                        {
+                                            <span class="badge" style="background-color: #d1e7dd; color: #0f5132; border: 1.5px solid #0f5132;">Active</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge" style="background-color: #f8d7da; color: #842029; border: 1.5px solid #842029;">Hidden</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@* Streamlined Auto-Redirecting Confirmation Modal (No Redundant Buttons) *@
+@if (!isStaff && Model.IsAvailable)
+{
+    <div id="addedToOrderPopup"
+         class="qrder-added-popup-backdrop d-none"
+         role="status"
+         aria-live="polite"
+         aria-hidden="true">
+        <div class="qrder-added-popup-card">
+            <div class="qrder-added-check" aria-hidden="true">&#10003;</div>
+            <h2 class="h5 fw-bold mb-1">Added to Order!</h2>
+            <p class="small text-muted fst-italic mb-0" id="addedToOrderSummaryText">
+                Returning to the menu...
+            </p>
+        </div>
+    </div>
+
+    @section Scripts {
+        <script>
+            (() => {
+                const basePrice = @Model.Price.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                const productId = @Model.Id;
+                const productName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Name));
+                const menuUrl = '@Url.Action("Index", "Products")';
+                const cartStorageKey = 'qrder_customer_cart';
+
+                const variantSelect = document.getElementById('variantSelect');
+                const addOnCheckboxes = document.querySelectorAll('.addon-checkbox');
+                const qtyInput = document.getElementById('quantityInput');
+                const qtyMinusBtn = document.getElementById('qtyMinusBtn');
+                const qtyPlusBtn = document.getElementById('qtyPlusBtn');
+                const livePriceEl = document.getElementById('liveItemTotalPrice');
+                const addBtn = document.getElementById('addToOrderBtn');
+                const popupBackdrop = document.getElementById('addedToOrderPopup');
+                const popupSummary = document.getElementById('addedToOrderSummaryText');
+
+                function computeTotal() {
+                    let unit = Number(basePrice) || 0;
+
+                    if (variantSelect && variantSelect.selectedOptions.length > 0) {
+                        unit += Number(variantSelect.selectedOptions[0].dataset.adj || 0);
+                    }
+
+                    addOnCheckboxes.forEach(cb => {
+                        if (cb.checked) {
+                            unit += Number(cb.dataset.adj || 0);
+                        }
+                    });
+
+                    const qty = Math.max(1, Math.min(99, Number(qtyInput?.value || 1)));
+                    return unit * qty;
+                }
+
+                function refreshPriceDisplay() {
+                    const total = computeTotal();
+                    const formatted = '₱' + total.toFixed(2);
+                    if (livePriceEl) livePriceEl.textContent = formatted;
+                    if (addBtn) addBtn.textContent = `Add to Order — ${formatted}`;
+                }
+
+                variantSelect?.addEventListener('change', refreshPriceDisplay);
+                addOnCheckboxes.forEach(cb => cb.addEventListener('change', refreshPriceDisplay));
+                qtyInput?.addEventListener('input', refreshPriceDisplay);
+
+                qtyMinusBtn?.addEventListener('click', () => {
+                    const current = Number(qtyInput?.value || 1);
+                    if (qtyInput) qtyInput.value = String(Math.max(1, current - 1));
+                    refreshPriceDisplay();
+                });
+
+                qtyPlusBtn?.addEventListener('click', () => {
+                    const current = Number(qtyInput?.value || 1);
+                    if (qtyInput) qtyInput.value = String(Math.min(99, current + 1));
+                    refreshPriceDisplay();
+                });
+
+                addBtn?.addEventListener('click', () => {
+                    const qty = Math.max(1, Math.min(99, Number(qtyInput?.value || 1)));
+                    const variantId = variantSelect && variantSelect.value ? Number(variantSelect.value) : null;
+                    const addOnIds = Array.from(addOnCheckboxes)
+                        .filter(cb => cb.checked)
+                        .map(cb => Number(cb.value))
+                        .sort((a, b) => a - b);
+
+                    let cart = [];
+                    try {
+                        const raw = sessionStorage.getItem(cartStorageKey);
+                        cart = raw ? JSON.parse(raw) : [];
+                        if (!Array.isArray(cart)) cart = [];
+                    } catch {
+                        cart = [];
+                    }
+
+                    const existingIndex = cart.findIndex(item =>
+                        Number(item.ProductId) === productId &&
+                        (item.VariantOptionId ? Number(item.VariantOptionId) : null) === variantId &&
+                        JSON.stringify((item.AddOnOptionIds || []).map(Number).sort((a, b) => a - b)) === JSON.stringify(addOnIds)
+                    );
+
+                    if (existingIndex >= 0) {
+                        cart[existingIndex].Quantity = Math.min(99, (Number(cart[existingIndex].Quantity) || 1) + qty);
+                    } else {
+                        cart.push({
+                            ProductId: productId,
+                            Quantity: qty,
+                            VariantOptionId: variantId,
+                            AddOnOptionIds: addOnIds
+                        });
+                    }
+
+                    try {
+                        sessionStorage.setItem(cartStorageKey, JSON.stringify(cart));
+                    } catch {
+                        // Ignore storage quota issues
+                    }
+
+                    if (popupSummary) {
+                        popupSummary.textContent = `${qty} × ${productName} added. Returning to menu...`;
+                    }
+
+                    if (popupBackdrop) {
+                        popupBackdrop.classList.remove('d-none');
+                        popupBackdrop.setAttribute('aria-hidden', 'false');
+                    }
+
+                    addBtn.disabled = true;
+
+                    setTimeout(() => {
+                        window.location.href = menuUrl;
+                    }, 900);
+                });
+
+                refreshPriceDisplay();
+            })();
+        </script>
+    }
+}

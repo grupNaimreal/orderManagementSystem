@@ -1,42 +1,227 @@
+@*
+    Views/Customers/Index.cshtml
+    PC & Tablet Landscape Customer Sessions Directory for QRDER (Bean Crate Cafe):
+    - Features the Neo-Industrial telemetry strip and 3 Split-Flap Departure-Board KPI tiles.
+    - Evaluates active vs. expired sessions using both IsActive and the 10-minute
+      inactivity window, with quick status filter tabs, live AJAX search, and
+      automatic 10-second background sync so new table scans appear automatically.
+*@
 @model IEnumerable<orderManagementSystem.Models.Customer>
+
 @{
-    ViewData["Title"] = "Customer Accounts";
+    ViewData["Title"] = "Customer Sessions";
+    var customerList = Model.ToList();
+    var activeCutoff = DateTime.UtcNow.AddMinutes(-10);
+
+    bool IsCurrentlyActive(orderManagementSystem.Models.Customer c) =>
+        c.IsActive && DateTime.SpecifyKind(c.LastActivityUtc, DateTimeKind.Utc) >= activeCutoff;
+
+    var totalCount = customerList.Count;
+    var activeCount = customerList.Count(IsCurrentlyActive);
+    var expiredCount = totalCount - activeCount;
 }
-<h1>Customer Accounts</h1>
-<p><a asp-action="Create" class="btn btn-primary w-100 w-sm-auto">Create Customer Session</a></p>
-<div class="mb-3">
-    <label for="customerSearch" class="form-label">Live search</label>
-    <input id="customerSearch" class="form-control" type="search"
-           placeholder="Search customer display names..."
-           data-search-url="@Url.Action("Search")" />
+
+<div class="qrder-telemetry-strip mb-3">
+    <div class="d-flex align-items-center gap-2">
+        <span class="qrder-beacon" aria-hidden="true"></span>
+        <span>CUSTOMER SESSIONS &middot; LIVE QR DIRECTORY</span>
+    </div>
+    <div class="qrder-tabular" id="telemetrySessionStats">
+        ACTIVE: @activeCount &middot; TOTAL: @totalCount &middot; 10M TIMEOUT
+    </div>
 </div>
-<div class="table-responsive">
-    <table class="table table-striped stack-table" id="customerTable">
-        <thead><tr><th>Name</th><th>Session</th><th>Last Activity (UTC)</th><th>Actions</th></tr></thead>
-        <tbody><partial name="_CustomerRows" model="Model" /></tbody>
-    </table>
+
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; BEAN CRATE CAFE</div>
+        <h1 class="qrder-page-title">Customer Sessions</h1>
+        <p class="qrder-page-subtitle mb-0">
+            Monitor active table QR sessions and walk-in customer profiles, sorted newest-first.
+        </p>
+    </div>
+
+    <div class="flex-shrink-0 d-flex align-items-center gap-2">
+        <a asp-action="Create"
+           data-qrder-loading="Opening new customer session form..."
+           class="btn menu-btn px-4 py-2 fw-bold text-nowrap">
+            + New Customer Session
+        </a>
+    </div>
 </div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-4">
+        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Total Sessions</div>
+            <div class="fs-3 fw-bold qrder-tabular mt-1" id="kpiTotalSessions">@totalCount</div>
+        </div>
+    </div>
+    <div class="col-6 col-sm-4">
+        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Active Now</div>
+            <div class="fs-3 fw-bold qrder-tabular mt-1" style="color: var(--qrder-roast);" id="kpiActiveSessions">@activeCount</div>
+        </div>
+    </div>
+    <div class="col-6 col-sm-4">
+        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Ended / Expired</div>
+            <div class="fs-3 fw-bold qrder-tabular mt-1 text-muted" id="kpiExpiredSessions">@expiredCount</div>
+        </div>
+    </div>
+</div>
+
+<div class="qrder-card">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
+        <div class="d-flex flex-wrap gap-2" id="sessionFilterTabs" role="group" aria-label="Filter sessions">
+            <button type="button" class="btn btn-sm menu-btn px-3 text-nowrap" data-session-filter="all">
+                All (@totalCount)
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary px-3 text-nowrap" data-session-filter="active">
+                Active (@activeCount)
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary px-3 text-nowrap" data-session-filter="inactive">
+                Ended / Expired (@expiredCount)
+            </button>
+        </div>
+
+        <div style="min-width: 250px;">
+            <label for="customerSearch" class="visually-hidden">Live search customer sessions</label>
+            <input id="customerSearch"
+                   class="form-control form-control-sm"
+                   type="search"
+                   placeholder="Search table or customer name..."
+                   data-search-url="@Url.Action("Search")" />
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle stack-table mb-0" id="customerTable">
+            <thead>
+                <tr>
+                    <th class="text-nowrap">Customer / Table</th>
+                    <th class="text-nowrap">Session Status</th>
+                    <th class="text-nowrap">Last Activity (PHT)</th>
+                    <th class="text-end text-nowrap">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="customerTableBody">
+                <partial name="_CustomerRows" model="Model" />
+            </tbody>
+        </table>
+    </div>
+
+    <div id="customerEmptyFilterMessage" class="text-center text-muted small py-4 d-none">
+        No customer sessions match the current filter or search query.
+    </div>
+</div>
+
 @section Scripts {
-<script>
-(() => {
-    const input = document.getElementById("customerSearch");
-    const body = document.querySelector("#customerTable tbody");
-    let timer;
-    let controller;
-    input.addEventListener("input", () => {
-        clearTimeout(timer);
-        timer = setTimeout(async () => {
-            controller?.abort();
-            controller = new AbortController();
-            try {
-                const url = input.dataset.searchUrl + "?term=" + encodeURIComponent(input.value);
-                const response = await fetch(url, { signal: controller.signal });
-                if (response.ok) body.innerHTML = await response.text();
-            } catch (error) {
-                if (error.name !== "AbortError") console.error(error);
+    <script>
+        (() => {
+            const input = document.getElementById("customerSearch");
+            const body = document.getElementById("customerTableBody");
+            const filterBtns = document.querySelectorAll("[data-session-filter]");
+            const emptyMsg = document.getElementById("customerEmptyFilterMessage");
+            let activeFilter = "all";
+            let timer;
+            let controller;
+
+            function applyRowFilter() {
+                if (!body) return;
+                let visible = 0;
+
+                body.querySelectorAll("tr").forEach(row => {
+                    const state = row.getAttribute("data-session-state") || "";
+                    if (!state) return;
+
+                    const show =
+                        activeFilter === "all" ||
+                        (activeFilter === "active" && state === "active") ||
+                        (activeFilter === "inactive" && state === "inactive");
+                    row.classList.toggle("d-none", !show);
+                    if (show) visible++;
+                });
+
+                if (emptyMsg) {
+                    emptyMsg.classList.toggle("d-none", visible > 0);
+                }
             }
-        }, 250);
-    });
-})();
-</script>
+
+            filterBtns.forEach(btn => {
+                btn.addEventListener("click", () => {
+                    activeFilter = btn.getAttribute("data-session-filter") || "all";
+                    filterBtns.forEach(b => {
+                        b.classList.remove("menu-btn");
+                        b.classList.add("btn-outline-secondary");
+                    });
+                    btn.classList.remove("btn-outline-secondary");
+                    btn.classList.add("menu-btn");
+                    applyRowFilter();
+                });
+            });
+
+            input?.addEventListener("input", () => {
+                clearTimeout(timer);
+                timer = setTimeout(async () => {
+                    controller?.abort();
+                    controller = new AbortController();
+                    try {
+                        const url = input.dataset.searchUrl + "?term=" + encodeURIComponent(input.value);
+                        const response = await fetch(url, { signal: controller.signal });
+                        if (response.ok && body) {
+                            body.innerHTML = await response.text();
+                            applyRowFilter();
+                        }
+                    } catch (error) {
+                        if (error.name !== "AbortError") console.error(error);
+                    }
+                }, 250);
+            });
+
+            // Background sync every 10s when not actively typing in search
+            async function syncCustomerSessions() {
+                if (document.hidden || document.activeElement === input || (input && input.value.trim().length > 0)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(window.location.href, {
+                        headers: { "X-Requested-With": "XMLHttpRequest" },
+                        cache: "no-store"
+                    });
+                    if (!response.ok) return;
+
+                    const html = await response.text();
+                    const doc = new DOMParser().parseFromString(html, "text/html");
+                    const nextBody = doc.getElementById("customerTableBody");
+                    if (!nextBody || !body) return;
+
+                    ["kpiTotalSessions", "kpiActiveSessions", "kpiExpiredSessions", "telemetrySessionStats"].forEach(id => {
+                        const cur = document.getElementById(id);
+                        const nxt = doc.getElementById(id);
+                        if (cur && nxt && cur.textContent !== nxt.textContent) {
+                            cur.textContent = nxt.textContent;
+                        }
+                    });
+
+                    ["all", "active", "inactive"].forEach(key => {
+                        const curTab = document.querySelector(`[data-session-filter="${key}"]`);
+                        const nxtTab = doc.querySelector(`[data-session-filter="${key}"]`);
+                        if (curTab && nxtTab && curTab.textContent !== nxtTab.textContent) {
+                            curTab.textContent = nxtTab.textContent;
+                        }
+                    });
+
+                    if (body.innerHTML !== nextBody.innerHTML) {
+                        body.innerHTML = nextBody.innerHTML;
+                        applyRowFilter();
+                    }
+                } catch {
+                    // Retry silently on next tick
+                }
+            }
+
+            setInterval(syncCustomerSessions, 10000);
+        })();
+    </script>
 }

@@ -1,72 +1,179 @@
+@*
+    Views/Products/_ProductRows.cshtml
+    Shared product card grid rendered inside Views/Products/Index.cshtml
+    and returned dynamically by ProductsController.Search.
+    - Resolves product images via MenuSeeder.ResolveProductImageUrl(item.ImageUrl, item.Name, WebEnv.WebRootPath)
+      so Linux/Docker deployments match exact filenames and extensions reliably.
+*@
+@using Microsoft.AspNetCore.Html
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment WebEnv
 @model IEnumerable<orderManagementSystem.Models.Product>
+
+@{
+    var isOwner = User.IsInRole("Owner");
+    var isStaff = isOwner || User.IsInRole("Employee");
+
+    (string BgGradient, string AccentColor, string SvgInner) GetProductVisual(string categoryName)
+    {
+        var key = categoryName.Trim().ToLowerInvariant();
+        return key switch
+        {
+            "coffee" => ("linear-gradient(135deg, #f3e5d8 0%, #e4ccb6 100%)", "#4A1C05",
+                "<path d='M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V9z'/><path d='M16 10h2a2 2 0 0 1 0 4h-2'/><path d='M8 4c0 1.5 1 2 1 3M12 4c0 1.5 1 2 1 3' stroke='#C05800'/>"),
+            "non-coffee" => ("linear-gradient(135deg, #f7ece1 0%, #ead6c3 100%)", "#6B3A1E",
+                "<path d='M7 7h10l-1 13H8L7 7z'/><path d='M6 7h12'/><path d='M14 3l-2 4' stroke='#C05800'/><path d='M7.5 13h9' stroke='#C05800'/>"),
+            "pasta" => ("linear-gradient(135deg, #fbe8d8 0%, #f3cfb3 100%)", "#8C3414",
+                "<path d='M4 13h16a8 8 0 0 1-16 0z'/><path d='M6 10c2-2 4 2 6 0s4 2 6 0' stroke='#C05800'/><path d='M5 6h14'/>"),
+            "sandwiches" => ("linear-gradient(135deg, #f8ebd7 0%, #ecd3ae 100%)", "#704214",
+                "<path d='M4 10a8 5 0 0 1 16 0H4z'/><path d='M3 13h18' stroke='#C05800' stroke-width='2.2'/><path d='M5 16h14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z'/>"),
+            "snacks" => ("linear-gradient(135deg, #fdf0d5 0%, #f5dc9f 100%)", "#7A4900",
+                "<path d='M6 10h12l-1.5 10h-9L6 10z'/><path d='M8 10V5M11 10V4M14 10V5M16 10V6' stroke='#C05800'/>"),
+            "juices & lemonades" => ("linear-gradient(135deg, #fcf6d8 0%, #f4e69c 100%)", "#6E5800",
+                "<path d='M7 8h10l-1.2 12H8.2L7 8z'/><circle cx='16' cy='7' r='3.5' stroke='#C05800'/><path d='M10 4l1.5 4'/>"),
+            "house blend" => ("linear-gradient(135deg, #f4e7d4 0%, #e5cda9 100%)", "#5C3A18",
+                "<path d='M7 6h9l-1 14H8L7 6z'/><path d='M16 9h2a2 2 0 0 1 0 5h-2'/><path d='M11 11c2-2 4 0 3 2s-3 2-3 0z' stroke='#C05800'/>"),
+            "lemon soda" => ("linear-gradient(135deg, #e7f4f8 0%, #cde7f0 100%)", "#1D5B72",
+                "<path d='M7 7h10l-1 13H8L7 7z'/><circle cx='11' cy='12' r='1' fill='#C05800'/><circle cx='14' cy='15' r='1.2' fill='#C05800'/><path d='M15 3l-2 4' stroke='#C05800'/>"),
+            "thai series & floats" => ("linear-gradient(135deg, #fae2cf 0%, #efc29e 100%)", "#8A3B08",
+                "<path d='M7 10h10l-1 10H8L7 10z'/><path d='M8 10a4 4 0 0 1 8 0' stroke='#C05800'/><path d='M15 4l-2 5' stroke='#C05800'/>"),
+            "parfait series" => ("linear-gradient(135deg, #fae3e8 0%, #f1c5d0 100%)", "#7A223B",
+                "<path d='M7 9h10l-2 9H9L7 9z'/><path d='M9 20h6M12 18v2'/><path d='M8 9a4 3.5 0 0 1 8 0' stroke='#C05800'/><circle cx='12' cy='4.5' r='1.3' fill='#C05800'/>"),
+            "specialty drinks" => ("linear-gradient(135deg, #f6e1e4 0%, #e7c2c8 100%)", "#6E2332",
+                "<path d='M7 9h10l-1 11H8L7 9z'/><path d='M6 7l3-3 3 2.5L15 4l3 3' stroke='#C05800'/>"),
+            "desserts & banana pudding" => ("linear-gradient(135deg, #f8ebd6 0%, #ebd2a9 100%)", "#5E3814",
+                "<path d='M5 13h14l-1.5 6h-11L5 13z'/><path d='M7 13a5 4 0 0 1 10 0' stroke='#C05800'/><circle cx='12' cy='7.5' r='1.3' fill='#C05800'/>"),
+            "buldak series" => ("linear-gradient(135deg, #fbe0dc 0%, #f2b8af 100%)", "#8F1D14",
+                "<path d='M4 12h16a8 7 0 0 1-16 0z'/><path d='M5 7l14-2M5 9l14-1' stroke='#C05800'/><path d='M12 15c1.5-1.5 1.5-3 0-4-1.5 1-1.5 2.5 0 4z' fill='#C05800'/>"),
+            "matcha foam series" => ("linear-gradient(135deg, #e5efe0 0%, #c9dec0 100%)", "#2D5224",
+                "<path d='M7 7h10l-1 13H8L7 7z'/><path d='M7.3 10.5h9.4' stroke='#C05800' stroke-width='2.4'/><path d='M14 3l-1.5 4'/>"),
+            "ube series" => ("linear-gradient(135deg, #ece3f5 0%, #d5c2ea 100%)", "#4B2673",
+                "<path d='M7 7h10l-1 13H8L7 7z'/><path d='M8 15c2-1.5 2 1.5 4 0s2 1.5 4 0' stroke='#C05800'/><path d='M14 3l-1.5 4'/>"),
+            "pistachio series" => ("linear-gradient(135deg, #e9efe1 0%, #d1dec1 100%)", "#3F5723",
+                "<path d='M7 8h10l-1 12H8L7 8z'/><ellipse cx='12' cy='5' rx='3' ry='1.8' stroke='#C05800'/><path d='M7.4 11h9.2' stroke='#C05800'/>"),
+            "rice bowls" => ("linear-gradient(135deg, #f6eadc 0%, #e7d1b8 100%)", "#5A3519",
+                "<path d='M4 12h16a8 7 0 0 1-16 0z'/><path d='M6 12a6 4 0 0 1 12 0' stroke='#C05800'/><path d='M8 20h8'/>"),
+            _ => ("linear-gradient(135deg, #f3e5d8 0%, #e4ccb6 100%)", "#4A1C05",
+                "<path d='M7 7h10l-1 13H8L7 7z'/><path d='M14 3l-2 4' stroke='#C05800'/>")
+        };
+    }
+}
 
 @if (!Model.Any())
 {
-    <div class="col-12 text-center py-5">
-        <h4 class="text-muted">No products found</h4>
-        <p class="text-muted">Try another search.</p>
+    <div class="col-12">
+        <div class="qrder-card text-center py-5">
+            <h2 class="h5 fw-bold mb-1">No products found</h2>
+            <p class="text-muted small mb-0">Try another search term or clear your filter.</p>
+        </div>
     </div>
+}
+
+@{
+    var cardIndex = 0;
 }
 
 @foreach (var item in Model)
 {
-    <div class="col-12 col-md-6 col-lg-4 col-xl-3">
-        <div class="product-card">
-            @if (!string.IsNullOrWhiteSpace(item.ImageUrl))
-            {
-                <img src="@item.ImageUrl"
-                     alt="@item.Name"
-                     class="product-image"
-                     loading="lazy" />
-            }
-            else
-            {
-                <div class="product-placeholder">
-                    Image coming soon
-                </div>
-            }
+    var detailsUrl = Url.Action("Details", "Products", new { id = item.Id });
+    var categoryName = string.IsNullOrWhiteSpace(item.Category?.Name) ? "Other" : item.Category!.Name.Trim();
+    var visual = GetProductVisual(categoryName);
+    var resolvedImageUrl = orderManagementSystem.Data.MenuSeeder.ResolveProductImageUrl(
+        item.ImageUrl,
+        item.Name,
+        WebEnv.WebRootPath);
+    var isAboveTheFold = cardIndex < 4;
+    cardIndex++;
 
-            <div class="p-3">
-                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                    <span class="badge bg-light text-dark">
-                        @(item.Category?.Name ?? "Other")
-                    </span>
-
-                    @if (item.IsAvailable)
-                    {
-                        <span class="badge bg-success">Available</span>
-                    }
-                    else
-                    {
-                        <span class="badge bg-secondary">Unavailable</span>
-                    }
-                </div>
-
-                <h5 class="product-name mb-1">@item.Name</h5>
-
-                <p class="product-price mb-3">
-                    ₱@item.Price.ToString("N2")
-                </p>
-
-                <a asp-action="Details"
-                   asp-route-id="@item.Id"
-                   class="btn menu-btn w-100">
-                    View Details
-                </a>
-
-                @if (User.IsInRole("Owner"))
-                {
-                    <div class="d-flex justify-content-center gap-3 mt-3">
-                        <a asp-action="Edit"
-                           asp-route-id="@item.Id"
-                           class="small">Edit</a>
-
-                        <a asp-action="Delete"
-                           asp-route-id="@item.Id"
-                           class="small text-danger">Retire</a>
+    <div class="col-6 col-md-4 col-lg-3" data-product-col data-category="@categoryName">
+        <div class="product-card d-flex flex-column position-relative">
+            <a href="@detailsUrl"
+               data-qrder-loading="Loading item options..."
+               class="text-decoration-none text-reset d-flex flex-column flex-grow-1">
+                <div class="product-image-square">
+                    <img src="@resolvedImageUrl"
+                         alt="@item.Name"
+                         width="400"
+                         height="400"
+                         class="product-image"
+                         loading="@(isAboveTheFold ? "eager" : "lazy")"
+                         decoding="async"
+                         fetchpriority="@(isAboveTheFold ? "high" : "auto")"
+                         onload="this.parentElement?.classList.add('is-loaded');"
+                         onerror="this.parentElement?.classList.add('is-loaded'); this.style.display='none'; this.nextElementSibling.classList.remove('d-none');" />
+                    <div class="product-placeholder d-none flex-column gap-2 px-3 text-center"
+                         style="background: @visual.BgGradient; color: @visual.AccentColor;">
+                        <svg viewBox="0 0 24 24"
+                             width="44"
+                             height="44"
+                             fill="none"
+                             stroke="currentColor"
+                             stroke-width="1.8"
+                             stroke-linecap="round"
+                             stroke-linejoin="round"
+                             aria-hidden="true">@Html.Raw(visual.SvgInner)</svg>
+                        <span class="fw-bold small" style="line-height: 1.2;">@item.Name</span>
                     </div>
-                }
-            </div>
+                </div>
+
+                <div class="p-3 d-flex flex-column flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-start gap-1 mb-2">
+                        <span class="badge"
+                              style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1.5px solid var(--qrder-border-strong);">
+                            @categoryName
+                        </span>
+
+                        @if (item.IsAvailable)
+                        {
+                            <span class="badge"
+                                  style="background-color: #d1e7dd; color: #0f5132; border: 1.5px solid #0f5132;">
+                                Available
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge"
+                                  style="background-color: #f8d7da; color: #842029; border: 1.5px solid #842029;">
+                                Unavailable
+                            </span>
+                        }
+                    </div>
+
+                    <h3 class="h6 product-name mb-1">@item.Name</h3>
+
+                    @if (!string.IsNullOrWhiteSpace(item.Description))
+                    {
+                        <p class="text-muted small mb-2" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                            @item.Description
+                        </p>
+                    }
+
+                    <div class="mt-auto pt-2">
+                        <div class="d-flex align-items-baseline justify-content-between mb-3">
+                            <span class="product-price qrder-tabular mb-0">₱@item.Price.ToString("N2")</span>
+                        </div>
+
+                        <span class="btn menu-btn w-100 fw-semibold">
+                            @(isStaff ? "Inspect & Options" : "Add to Order")
+                        </span>
+                    </div>
+                </div>
+            </a>
+
+            @if (isOwner)
+            {
+                <div class="px-3 pb-3 pt-0 d-flex gap-2">
+                    <a asp-action="Edit"
+                       asp-route-id="@item.Id"
+                       class="btn btn-sm btn-outline-secondary flex-fill">
+                        Edit
+                    </a>
+                    <a asp-action="Delete"
+                       asp-route-id="@item.Id"
+                       class="btn btn-sm btn-outline-danger flex-fill">
+                        Retire
+                    </a>
+                </div>
+            }
         </div>
     </div>
 }
