@@ -1,8 +1,9 @@
 @*
     Views/Reports/Index.cshtml
     PC & Tablet Landscape Sales Reports & VAT Breakdown for QRDER (Bean Crate Cafe):
-    - Preset date filters (Today, Last 7 Days, This Month) + custom date picker
-    - Gross Sales, Net Sales, 12% VAT Collected, Cash vs. Online (Maya) breakdown
+    - Features Neo-Industrial financial telemetry strip and 4 Split-Flap KPI tiles.
+    - Preset date filters (Today, Last 7 Days, This Month) + custom date picker.
+    - Gross Sales, Net Sales, 12% VAT Collected, Cash vs. Online (Maya) breakdown.
     - Top-selling items table, detailed order ledger, CSV export, and
       15-column (A–O) batch clipboard copy for Project Encord / BIR Disb Excel workbooks.
 *@
@@ -60,7 +61,26 @@
     });
 
     var encordBatchPayload = string.Join("\n", encordBatchLines);
+
+    string StatusBadgeStyle(string status) => status switch
+    {
+        "Pending" => "background-color: #fff3cd; color: #664d03; border: 1.5px solid #664d03;",
+        "Preparing" => "background-color: #cfe2ff; color: #084298; border: 1.5px solid #084298;",
+        "Completed" => "background-color: #d1e7dd; color: #0f5132; border: 1.5px solid #0f5132;",
+        "Cancelled" => "background-color: #f8d7da; color: #842029; border: 1.5px solid #842029;",
+        _ => "background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1.5px solid var(--qrder-border-strong);"
+    };
 }
+
+<div class="qrder-telemetry-strip mb-3">
+    <div class="d-flex align-items-center gap-2">
+        <span class="qrder-beacon" aria-hidden="true"></span>
+        <span>FINANCIAL TELEMETRY &middot; SALES &amp; VAT LEDGER</span>
+    </div>
+    <div class="qrder-tabular">
+        GROSS: ₱@Model.GrossSales.ToString("N2") &middot; ORDERS: @Model.TotalOrders &middot; PHT (UTC+8)
+    </div>
+</div>
 
 <div class="d-flex flex-column flex-xl-row align-items-xl-end justify-content-between gap-3 mb-4">
     <div>
@@ -99,7 +119,7 @@
            class="btn btn-sm btn-outline-secondary px-3 py-2 fw-bold text-nowrap">
             Open Project Encord &#8599;
         </a>
-        <span id="encordBatchCopyStatus" class="small text-success fw-bold d-none text-nowrap">
+        <span id="encordBatchCopyStatus" class="small fw-bold d-none text-nowrap" style="color: var(--qrder-roast);">
             Copied @validReportOrders.Count row(s) &#10003;
         </span>
     </div>
@@ -155,20 +175,20 @@
     </div>
 </div>
 
-@* KPI Summary Cards *@
+@* Split-Flap KPI Summary Cards *@
 <div class="row g-3 mb-4">
     <div class="col-6 col-xl-3">
-        <div class="qrder-card h-100">
-            <div class="small text-muted fw-bold">Gross Sales (VAT-Inc.)</div>
-            <div class="fs-3 fw-bold mt-1" style="color: var(--qrder-roast);">₱@Model.GrossSales.ToString("N2")</div>
-            <div class="small text-muted mt-1">@Model.TotalOrders active/completed order(s)</div>
+        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Gross Sales (VAT-Inc.)</div>
+            <div class="fs-3 fw-bold qrder-tabular mt-1" style="color: var(--qrder-roast);">₱@Model.GrossSales.ToString("N2")</div>
+            <div class="small text-muted qrder-tabular mt-1">@Model.TotalOrders active/completed order(s)</div>
         </div>
     </div>
     <div class="col-6 col-xl-3">
-        <div class="qrder-card h-100">
-            <div class="small text-muted fw-bold">Net Sales (Excl. VAT)</div>
-            <div class="fs-3 fw-bold mt-1">₱@Model.NetSales.ToString("N2")</div>
-            <div class="small text-muted mt-1">
+        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Net Sales (Excl. VAT)</div>
+            <div class="fs-3 fw-bold qrder-tabular mt-1">₱@Model.NetSales.ToString("N2")</div>
+            <div class="small text-muted qrder-tabular mt-1">
                 12% VAT: ₱@Model.VatAmount.ToString("N2") &middot;
                 <a href="https://encord-bir-encoder2026-cyh5ffaghqhwhbht.eastasia-01.azurewebsites.net/"
                    target="_blank"
@@ -180,17 +200,17 @@
         </div>
     </div>
     <div class="col-6 col-xl-3">
-        <div class="qrder-card h-100">
-            <div class="small text-muted fw-bold">Cash vs. Online</div>
-            <div class="fw-bold mt-2">Cash: ₱@Model.CashSales.ToString("N2")</div>
-            <div class="small text-muted">Online (Maya): ₱@Model.CashlessSales.ToString("N2")</div>
+        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Cash vs. Online</div>
+            <div class="fw-bold qrder-tabular mt-2">Cash: ₱@Model.CashSales.ToString("N2")</div>
+            <div class="small text-muted qrder-tabular">Online (Maya): ₱@Model.CashlessSales.ToString("N2")</div>
         </div>
     </div>
     <div class="col-6 col-xl-3">
-        <div class="qrder-card h-100">
-            <div class="small text-muted fw-bold">Order Fulfillment</div>
-            <div class="fw-bold mt-2">Completed: @Model.CompletedOrders</div>
-            <div class="small text-muted">Cancelled: @Model.CancelledOrders</div>
+        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Order Fulfillment</div>
+            <div class="fw-bold qrder-tabular mt-2">Completed: @Model.CompletedOrders</div>
+            <div class="small text-muted qrder-tabular">Cancelled: @Model.CancelledOrders</div>
         </div>
     </div>
 </div>
@@ -220,8 +240,8 @@
                             {
                                 <tr>
                                     <td class="fw-bold">@item.ProductName</td>
-                                    <td class="text-center fw-semibold">@item.QuantitySold</td>
-                                    <td class="text-end fw-bold" style="color: var(--qrder-roast);">₱@item.Revenue.ToString("N2")</td>
+                                    <td class="text-center fw-semibold qrder-tabular">@item.QuantitySold</td>
+                                    <td class="text-end fw-bold qrder-tabular" style="color: var(--qrder-roast);">₱@item.Revenue.ToString("N2")</td>
                                 </tr>
                             }
                         </tbody>
@@ -261,16 +281,23 @@
                                     manilaTz
                                 );
                                 <tr>
-                                    <td data-label="Order #">
-                                        <a asp-controller="Orders" asp-action="Details" asp-route-id="@o.Id" class="fw-bold text-decoration-none">
+                                    <td data-label="Order #" class="qrder-tabular">
+                                        <a asp-controller="Orders"
+                                           asp-action="Details"
+                                           asp-route-id="@o.Id"
+                                           class="fw-bold text-decoration-none">
                                             #@o.Id
                                         </a>
                                     </td>
-                                    <td data-label="Time (PHT)" class="small">@localDt.ToString("MMM dd, hh:mm tt")</td>
+                                    <td data-label="Time (PHT)" class="small qrder-tabular text-nowrap">@localDt.ToString("MMM dd, hh:mm tt")</td>
                                     <td data-label="Customer" class="fw-semibold">@o.CustomerName</td>
                                     <td data-label="Method" class="small">@o.PaymentMethod (@o.PaymentStatus)</td>
-                                    <td data-label="Status" class="small fw-semibold">@o.Status</td>
-                                    <td data-label="Total" class="text-end fw-bold" style="color: var(--qrder-roast);">₱@o.TotalAmount.ToString("N2")</td>
+                                    <td data-label="Status">
+                                        <span class="badge" style="@StatusBadgeStyle(o.Status)">
+                                            @o.Status
+                                        </span>
+                                    </td>
+                                    <td data-label="Total" class="text-end fw-bold qrder-tabular text-nowrap" style="color: var(--qrder-roast);">₱@o.TotalAmount.ToString("N2")</td>
                                 </tr>
                             }
                         </tbody>

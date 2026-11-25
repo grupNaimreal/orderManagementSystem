@@ -1,6 +1,7 @@
 @*
     Views/Customers/Index.cshtml
     PC & Tablet Landscape Customer Sessions Directory for QRDER (Bean Crate Cafe):
+    - Features the Neo-Industrial telemetry strip and 3 Split-Flap Departure-Board KPI tiles.
     - Evaluates active vs. expired sessions using both IsActive and the 10-minute
       inactivity window, with quick status filter tabs, live AJAX search, and
       automatic 10-second background sync so new table scans appear automatically.
@@ -20,6 +21,16 @@
     var expiredCount = totalCount - activeCount;
 }
 
+<div class="qrder-telemetry-strip mb-3">
+    <div class="d-flex align-items-center gap-2">
+        <span class="qrder-beacon" aria-hidden="true"></span>
+        <span>CUSTOMER SESSIONS &middot; LIVE QR DIRECTORY</span>
+    </div>
+    <div class="qrder-tabular" id="telemetrySessionStats">
+        ACTIVE: @activeCount &middot; TOTAL: @totalCount &middot; 10M TIMEOUT
+    </div>
+</div>
+
 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
         <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; BEAN CRATE CAFE</div>
@@ -30,33 +41,31 @@
     </div>
 
     <div class="flex-shrink-0 d-flex align-items-center gap-2">
-        <span class="small text-muted d-none d-sm-inline-flex align-items-center gap-1 me-1"
-              title="Automatically checks for new table scans and expired sessions">
-            <span class="text-success">&#9679;</span> Live Sessions
-        </span>
-        <a asp-action="Create" class="btn menu-btn px-4 py-2 fw-bold text-nowrap">
+        <a asp-action="Create"
+           data-qrder-loading="Opening new customer session form..."
+           class="btn menu-btn px-4 py-2 fw-bold text-nowrap">
             + New Customer Session
         </a>
     </div>
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-4">
-        <div class="qrder-callout">
-            <div class="small text-muted fw-bold">Total Sessions</div>
-            <div class="fs-4 fw-bold mt-1" id="kpiTotalSessions">@totalCount</div>
+    <div class="col-12 col-sm-4">
+        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Total Sessions</div>
+            <div class="fs-3 fw-bold qrder-tabular mt-1" id="kpiTotalSessions">@totalCount</div>
         </div>
     </div>
-    <div class="col-4">
-        <div class="qrder-callout">
-            <div class="small text-muted fw-bold">Active Now</div>
-            <div class="fs-4 fw-bold mt-1 text-success" id="kpiActiveSessions">@activeCount</div>
+    <div class="col-6 col-sm-4">
+        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Active Now</div>
+            <div class="fs-3 fw-bold qrder-tabular mt-1" style="color: var(--qrder-roast);" id="kpiActiveSessions">@activeCount</div>
         </div>
     </div>
-    <div class="col-4">
-        <div class="qrder-callout">
-            <div class="small text-muted fw-bold">Ended / Expired</div>
-            <div class="fs-4 fw-bold mt-1 text-muted" id="kpiExpiredSessions">@expiredCount</div>
+    <div class="col-6 col-sm-4">
+        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Ended / Expired</div>
+            <div class="fs-3 fw-bold qrder-tabular mt-1 text-muted" id="kpiExpiredSessions">@expiredCount</div>
         </div>
     </div>
 </div>
@@ -100,6 +109,10 @@
             </tbody>
         </table>
     </div>
+
+    <div id="customerEmptyFilterMessage" class="text-center text-muted small py-4 d-none">
+        No customer sessions match the current filter or search query.
+    </div>
 </div>
 
 @section Scripts {
@@ -108,12 +121,15 @@
             const input = document.getElementById("customerSearch");
             const body = document.getElementById("customerTableBody");
             const filterBtns = document.querySelectorAll("[data-session-filter]");
+            const emptyMsg = document.getElementById("customerEmptyFilterMessage");
             let activeFilter = "all";
             let timer;
             let controller;
 
             function applyRowFilter() {
                 if (!body) return;
+                let visible = 0;
+
                 body.querySelectorAll("tr").forEach(row => {
                     const state = row.getAttribute("data-session-state") || "";
                     if (!state) return;
@@ -123,7 +139,12 @@
                         (activeFilter === "active" && state === "active") ||
                         (activeFilter === "inactive" && state === "inactive");
                     row.classList.toggle("d-none", !show);
+                    if (show) visible++;
                 });
+
+                if (emptyMsg) {
+                    emptyMsg.classList.toggle("d-none", visible > 0);
+                }
             }
 
             filterBtns.forEach(btn => {
@@ -175,7 +196,7 @@
                     const nextBody = doc.getElementById("customerTableBody");
                     if (!nextBody || !body) return;
 
-                    ["kpiTotalSessions", "kpiActiveSessions", "kpiExpiredSessions"].forEach(id => {
+                    ["kpiTotalSessions", "kpiActiveSessions", "kpiExpiredSessions", "telemetrySessionStats"].forEach(id => {
                         const cur = document.getElementById(id);
                         const nxt = doc.getElementById(id);
                         if (cur && nxt && cur.textContent !== nxt.textContent) {

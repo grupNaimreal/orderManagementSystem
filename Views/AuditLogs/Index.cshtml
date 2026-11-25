@@ -1,21 +1,44 @@
 @*
     Views/AuditLogs/Index.cshtml
-    Owner-only Audit Trail screen for QRDER (Bean Crate Cafe).
+    Owner-only Audit Trail screen for QRDER (Bean Crate Cafe):
+    - Features Neo-Industrial governance telemetry strip, cross-platform Asia/Manila PHT
+      timestamp resolution, instant client-side search filter, and Dark Mode stamp badges.
 *@
 @model IEnumerable<orderManagementSystem.Models.AuditLog>
 
 @{
     ViewData["Title"] = "Audit Trail";
-    var manilaTz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+
+    TimeZoneInfo ResolveManilaTimeZone()
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila"); }
+        catch
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time"); }
+            catch { return TimeZoneInfo.CreateCustomTimeZone("PHT", TimeSpan.FromHours(8), "Philippine Standard Time", "PHT"); }
+        }
+    }
+
+    var manilaTz = ResolveManilaTimeZone();
     var migrationPending = ViewBag.MigrationPending is bool pending && pending;
     var logsList = Model.ToList();
 }
+
+<div class="qrder-telemetry-strip mb-3">
+    <div class="d-flex align-items-center gap-2">
+        <span class="qrder-beacon" aria-hidden="true"></span>
+        <span>AUDIT TELEMETRY &middot; OWNER GOVERNANCE LOG</span>
+    </div>
+    <div class="qrder-tabular">
+        ENTRIES: @logsList.Count &middot; PHT (UTC+8)
+    </div>
+</div>
 
 <div class="mb-4">
     <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; OWNER GOVERNANCE</div>
     <h1 class="qrder-page-title">Audit Trail</h1>
     <p class="qrder-page-subtitle mb-0">
-        Chronological record of system activity, report exports, and administrative actions for Bean Crate Cafe.
+        Chronological record of system activity, payment confirmations, report exports, and administrative actions for Bean Crate Cafe.
     </p>
 </div>
 
@@ -34,43 +57,70 @@
         <div class="text-center py-5">
             <h2 class="h5 fw-bold mb-1">No audit entries recorded yet</h2>
             <p class="text-muted small mb-0">
-                Actions such as exporting sales reports or updating system records will appear here automatically.
+                Actions such as confirming payments, exporting sales reports, or updating system records will appear here automatically.
             </p>
         </div>
     }
     else
     {
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3">
+            <div class="small text-muted fw-semibold">
+                Showing <span id="auditVisibleCount" class="fw-bold qrder-tabular">@logsList.Count</span> of <span class="qrder-tabular">@logsList.Count</span> recorded event(s)
+            </div>
+            <div style="min-width: 260px;">
+                <label for="auditSearchInput" class="visually-hidden">Filter audit entries</label>
+                <input id="auditSearchInput"
+                       type="search"
+                       class="form-control form-control-sm"
+                       placeholder="Filter by actor, action, target, or details..." />
+            </div>
+        </div>
+
         <div class="table-responsive">
-            <table class="table table-hover align-middle stack-table mb-0">
+            <table class="table table-hover align-middle stack-table mb-0" id="auditLogTable">
                 <thead>
                     <tr>
-                        <th>Timestamp (PHT)</th>
-                        <th>Actor</th>
-                        <th>Role</th>
-                        <th>Action</th>
-                        <th>Target</th>
+                        <th class="text-nowrap">Timestamp (PHT)</th>
+                        <th class="text-nowrap">Actor</th>
+                        <th class="text-nowrap">Role</th>
+                        <th class="text-nowrap">Action</th>
+                        <th class="text-nowrap">Target</th>
                         <th>Details</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="auditLogTableBody">
                     @foreach (var log in logsList)
                     {
                         var localDt = TimeZoneInfo.ConvertTimeFromUtc(
                             DateTime.SpecifyKind(log.TimestampUtc, DateTimeKind.Utc),
                             manilaTz
                         );
-                        <tr>
-                            <td data-label="Timestamp (PHT)" class="small">
+                        var isOwnerActor = string.Equals(log.ActorRole, "Owner", StringComparison.OrdinalIgnoreCase);
+                        var searchBlob = $"{log.ActorName} {log.ActorRole} {log.ActionType} {log.EntityName} {log.EntityId} {log.Details}".ToLowerInvariant();
+
+                        <tr data-audit-search="@searchBlob">
+                            <td data-label="Timestamp (PHT)" class="small qrder-tabular text-nowrap">
                                 @localDt.ToString("MMM dd, yyyy hh:mm:ss tt")
                             </td>
                             <td data-label="Actor" class="fw-semibold">@log.ActorName</td>
-                            <td data-label="Role">
-                                <span class="badge rounded-pill" style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1px solid var(--qrder-border);">
-                                    @log.ActorRole
-                                </span>
+                            <td data-label="Role" class="text-nowrap">
+                                @if (isOwnerActor)
+                                {
+                                    <span class="badge"
+                                          style="background-color: var(--qrder-espresso); color: #f6efe6; border: 1.5px solid var(--qrder-border-strong);">
+                                        @log.ActorRole
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge"
+                                          style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1.5px solid var(--qrder-border-strong);">
+                                        @log.ActorRole
+                                    </span>
+                                }
                             </td>
-                            <td data-label="Action" class="fw-semibold">@log.ActionType</td>
-                            <td data-label="Target" class="small">
+                            <td data-label="Action" class="fw-bold text-nowrap">@log.ActionType</td>
+                            <td data-label="Target" class="small qrder-tabular text-nowrap">
                                 @log.EntityName @(string.IsNullOrWhiteSpace(log.EntityId) ? "" : $"#{log.EntityId}")
                             </td>
                             <td data-label="Details" class="small text-muted">@log.Details</td>
@@ -79,5 +129,37 @@
                 </tbody>
             </table>
         </div>
+
+        <div id="auditEmptyFilterMessage" class="text-center text-muted small py-4 d-none">
+            No audit log entries match your filter.
+        </div>
     }
 </div>
+
+@section Scripts {
+    <script>
+        (() => {
+            const searchInput = document.getElementById("auditSearchInput");
+            const tableBody = document.getElementById("auditLogTableBody");
+            const visibleCount = document.getElementById("auditVisibleCount");
+            const emptyMsg = document.getElementById("auditEmptyFilterMessage");
+
+            if (!searchInput || !tableBody) return;
+
+            searchInput.addEventListener("input", () => {
+                const query = searchInput.value.trim().toLowerCase();
+                let count = 0;
+
+                tableBody.querySelectorAll("tr").forEach(row => {
+                    const haystack = row.getAttribute("data-audit-search") || "";
+                    const match = !query || haystack.includes(query);
+                    row.classList.toggle("d-none", !match);
+                    if (match) count++;
+                });
+
+                if (visibleCount) visibleCount.textContent = String(count);
+                if (emptyMsg) emptyMsg.classList.toggle("d-none", count > 0);
+            });
+        })();
+    </script>
+}

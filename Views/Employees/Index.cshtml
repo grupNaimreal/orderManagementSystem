@@ -1,51 +1,195 @@
+@*
+    Views/Employees/Index.cshtml
+    Owner-only Staff Accounts & Role Governance directory for QRDER (Bean Crate Cafe):
+    - Displays Neo-Industrial telemetry strip and 4 Split-Flap KPI tiles (Total, Owners, Staff, Active).
+    - Preserves live debounced server search (@Url.Action("Search")) into _EmployeeRows.cshtml
+      with data-status filtering and full Light/Dark Mode parity across Mobile, Tablet, and PC.
+*@
 @model IEnumerable<orderManagementSystem.Models.StaffRowViewModel>
+
 @{
     ViewData["Title"] = "Staff Accounts";
+    var staffList = Model.ToList();
+    var totalStaff = staffList.Count;
+    var ownerCount = staffList.Count(s => string.Equals(s.Role, "Owner", StringComparison.OrdinalIgnoreCase));
+    var employeeCount = staffList.Count(s => string.Equals(s.Role, "Employee", StringComparison.OrdinalIgnoreCase));
+    var activeCount = staffList.Count(s => s.IsActive);
 }
-<h1>Staff Accounts</h1>
+
+<div class="qrder-telemetry-strip mb-3">
+    <div class="d-flex align-items-center gap-2">
+        <span class="qrder-beacon" aria-hidden="true"></span>
+        <span>STAFF DIRECTORY &middot; ACCESS GOVERNANCE</span>
+    </div>
+    <div class="qrder-tabular">
+        ACTIVE: @activeCount &middot; TOTAL: @totalStaff &middot; OWNER CONSOLE
+    </div>
+</div>
+
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <div class="qrder-eyebrow"><span class="qrder-wordmark-inline">QRDER</span> &middot; BEAN CRATE CAFE</div>
+        <h1 class="qrder-page-title">Staff Accounts</h1>
+        <p class="qrder-page-subtitle mb-0">
+            Manage Owner and Counter/Kitchen staff logins, employee codes, roles, and active status.
+        </p>
+    </div>
+
+    <div class="flex-shrink-0">
+        <a asp-action="Create"
+           data-qrder-loading="Opening new staff account form..."
+           class="btn menu-btn px-4 py-2 fw-bold text-nowrap">
+            + Create Staff Account
+        </a>
+    </div>
+</div>
+
+@if (TempData["StaffNotice"] != null)
+{
+    <div class="alert alert-info mb-4" role="status">
+        @TempData["StaffNotice"]
+    </div>
+}
+
 @if (TempData["StaffError"] != null)
 {
-    <div class="alert alert-danger" role="alert">
+    <div class="alert alert-danger mb-4" role="alert">
         @TempData["StaffError"]
     </div>
 }
-<p><a asp-action="Create" class="btn btn-primary w-100 w-sm-auto">Create Staff Account</a></p>
-<input id="staffSearch" class="form-control mb-3" type="search" placeholder="Search name, email, or role..." data-url="@Url.Action("Search")" />
-<div class="table-responsive">
-    <table class="table table-striped stack-table" id="staffTable">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Employee Code</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody><partial name="_EmployeeRows" model="Model" /></tbody>
-    </table>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Total Accounts</div>
+            <div class="fs-3 fw-bold qrder-tabular mt-1">@totalStaff</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Owners</div>
+            <div class="fs-3 fw-bold qrder-tabular mt-1">@ownerCount</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Staff / Counter</div>
+            <div class="fs-3 fw-bold qrder-tabular mt-1">@employeeCount</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Active Logins</div>
+            <div class="fs-3 fw-bold qrder-tabular mt-1" style="color: var(--qrder-roast);">@activeCount</div>
+        </div>
+    </div>
 </div>
+
+<div class="qrder-card">
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-2 mb-3">
+        <div class="d-flex flex-wrap align-items-center gap-2" id="staffStatusTabs" role="group" aria-label="Filter staff status">
+            <button type="button" class="btn btn-sm menu-btn px-3 text-nowrap" data-staff-filter="all">All (@totalStaff)</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary px-3 text-nowrap" data-staff-filter="active">Active (@activeCount)</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary px-3 text-nowrap" data-staff-filter="inactive">Deactivated (@(totalStaff - activeCount))</button>
+        </div>
+
+        <div class="flex-shrink-0" style="min-width: 240px;">
+            <input id="staffSearch"
+                   class="form-control form-control-sm"
+                   type="search"
+                   placeholder="Search name, code, email, or role..."
+                   aria-label="Search staff accounts"
+                   data-url="@Url.Action("Search")" />
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle stack-table mb-0" id="staffTable">
+            <thead>
+                <tr>
+                    <th class="text-nowrap">Name</th>
+                    <th class="text-nowrap">Employee Code</th>
+                    <th class="text-nowrap">Email</th>
+                    <th class="text-nowrap">Role</th>
+                    <th class="text-nowrap">Status</th>
+                    <th class="text-end text-nowrap">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <partial name="_EmployeeRows" model="Model" />
+            </tbody>
+        </table>
+    </div>
+
+    <div id="staffEmptyFilterMessage" class="text-center text-muted small py-4 d-none">
+        No staff accounts match the current filter or search query.
+    </div>
+</div>
+
 @section Scripts {
-<script>
-(() => {
-    const input = document.getElementById('staffSearch');
-    const body = document.querySelector('#staffTable tbody');
-    let timer;
-    let request;
-    input.addEventListener('input', () => {
-        clearTimeout(timer);
-        timer = setTimeout(async () => {
-            request?.abort();
-            request = new AbortController();
-            try {
-                const response = await fetch(input.dataset.url + '?term=' + encodeURIComponent(input.value), { signal: request.signal });
-                if (response.ok) body.innerHTML = await response.text();
-            } catch (error) {
-                if (error.name !== 'AbortError') console.error(error);
+    <script>
+        (() => {
+            const input = document.getElementById('staffSearch');
+            const body = document.querySelector('#staffTable tbody');
+            const statusTabs = document.querySelectorAll('#staffStatusTabs [data-staff-filter]');
+            const emptyMsg = document.getElementById('staffEmptyFilterMessage');
+
+            if (!input || !body) return;
+
+            let activeStatus = 'all';
+            let timer;
+            let request;
+
+            function applyStatusFilter() {
+                const rows = body.querySelectorAll('tr[data-status]');
+                let visible = 0;
+
+                rows.forEach((row) => {
+                    const status = row.getAttribute('data-status') || 'active';
+                    const matches =
+                        activeStatus === 'all' ||
+                        status === activeStatus;
+
+                    row.classList.toggle('d-none', !matches);
+                    if (matches) visible++;
+                });
+
+                if (emptyMsg) {
+                    emptyMsg.classList.toggle('d-none', visible > 0);
+                }
             }
-        }, 250);
-    });
-})();
-</script>
+
+            statusTabs.forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    activeStatus = btn.getAttribute('data-staff-filter') || 'all';
+                    statusTabs.forEach((b) => {
+                        b.classList.remove('menu-btn');
+                        b.classList.add('btn-outline-secondary');
+                    });
+                    btn.classList.remove('btn-outline-secondary');
+                    btn.classList.add('menu-btn');
+                    applyStatusFilter();
+                });
+            });
+
+            input.addEventListener('input', () => {
+                clearTimeout(timer);
+                timer = setTimeout(async () => {
+                    request?.abort();
+                    request = new AbortController();
+                    try {
+                        const response = await fetch(input.dataset.url + '?term=' + encodeURIComponent(input.value), {
+                            signal: request.signal
+                        });
+                        if (response.ok) {
+                            body.innerHTML = await response.text();
+                            applyStatusFilter();
+                        }
+                    } catch (error) {
+                        if (error.name !== 'AbortError') console.error(error);
+                    }
+                }, 250);
+            });
+        })();
+    </script>
 }

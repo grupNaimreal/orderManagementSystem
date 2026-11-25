@@ -69,7 +69,7 @@ public static class MenuSeeder
         // Specialty Drinks
         "Red Velvet Mocha", "Rose Matcha Latte", "Neopolitan Latte",
         // Desserts & Banana Pudding
-        "Brownie Ala Mode", "Banana Pudding", "Banana Pudding Matcha Latte",
+        "Brownie Ala Mode", "Banana Pudding", "Banana Pudding Matcha Latte", "The Cookie Pour",
         // Buldak Series
         "Cheesy Buldak", "Buldak Omelet", "Buldak Overload",
         // Matcha Foam Series
@@ -259,6 +259,31 @@ public static class MenuSeeder
                 }
             }
 
+            // Ensure "The Cookie Pour" exists in existing databases under Desserts & Banana Pudding (marked Unavailable for now)
+            var dessertsCategory = await context.Categories
+                .FirstOrDefaultAsync(c => c.Name == "Desserts & Banana Pudding");
+
+            if (dessertsCategory != null)
+            {
+                var cookiePourExists = await context.Products
+                    .AnyAsync(p => p.IsActive && p.Name == "The Cookie Pour");
+
+                if (!cookiePourExists)
+                {
+                    context.Products.Add(new Product
+                    {
+                        CategoryId = dessertsCategory.Id,
+                        Name = "The Cookie Pour",
+                        Price = 150m,
+                        Description = "Warm, soft-baked cookies served in a bowl with a separate pitcher of chilled milk on the side—pour, soak, and enjoy.",
+                        ImageUrl = $"/images/products/{ToProductSlug("The Cookie Pour")}.png",
+                        IsAvailable = false,
+                        IsActive = true
+                    });
+                    await context.SaveChangesAsync();
+                }
+            }
+
             // Replace the 8 legacy starter items so the full Bean Crate Cafe menu can seed
             if (activeCount == 8)
             {
@@ -313,7 +338,8 @@ public static class MenuSeeder
             string name,
             decimal basePrice,
             string? description = null,
-            IEnumerable<(string Name, string Type, decimal Adj)>? options = null)
+            IEnumerable<(string Name, string Type, decimal Adj)>? options = null,
+            bool isAvailable = true)
         {
             var product = new Product
             {
@@ -322,7 +348,7 @@ public static class MenuSeeder
                 Price = basePrice,
                 Description = description,
                 ImageUrl = $"/images/products/{ToProductSlug(name)}.png",
-                IsAvailable = true,
+                IsAvailable = isAvailable,
                 IsActive = true
             };
 
@@ -484,6 +510,12 @@ public static class MenuSeeder
             MakeItem("Desserts & Banana Pudding", "Brownie Ala Mode", 110m, "Warm fudgy brownie topped with vanilla ice cream, chocolate drizzle, and cherry."),
             MakeItem("Desserts & Banana Pudding", "Banana Pudding", 90m, "Creamy house banana pudding cup drizzled with caramel."),
             MakeItem("Desserts & Banana Pudding", "Banana Pudding Matcha Latte", 190m, "Iced matcha latte topped with rich house banana pudding.", IcedOnlyDrink()),
+            MakeItem(
+                "Desserts & Banana Pudding",
+                "The Cookie Pour",
+                150m,
+                "Warm, soft-baked cookies served in a bowl with a separate pitcher of chilled milk on the side—pour, soak, and enjoy.",
+                isAvailable: false),
 
             // ================= PAGE 7: BULDAK SERIES =================
             MakeItem("Buldak Series", "Cheesy Buldak", 160m, "Spicy Korean fire noodles topped with melted cheese and nori flakes."),
