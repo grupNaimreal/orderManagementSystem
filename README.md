@@ -1,5 +1,6 @@
 # QRDER — Bean Crate Cafe Digital Order Management & POS System
 
+**Version:** `1.0.0` (See [CHANGELOG.md](CHANGELOG.md))  
 **Live Deployment:** [https://qrder-beancrate.onrender.com](https://qrder-beancrate.onrender.com)  
 **Health Check Endpoint:** `GET /health`
 
@@ -96,6 +97,12 @@ Configure the following environment variables in your Render Web Service dashboa
 | `Maya__BaseUrl` | `https://pg-sandbox.paymaya.com` (or production Maya endpoint) |
 | `Maya__PublicApiKey` | Maya Checkout Public API Key |
 | `Maya__SecretApiKey` | Maya Checkout Secret API Key |
+
+---
+
+## Version History
+
+Full release notes are maintained in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
