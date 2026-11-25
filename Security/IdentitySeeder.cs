@@ -1,3 +1,7 @@
+// Security/IdentitySeeder.cs
+// Seeds the Owner and Employee roles and ensures clean demo accounts exist
+// (removing any stale Owner account that no longer matches InitialOwner:Email).
+
 using Microsoft.AspNetCore.Identity;
 
 namespace orderManagementSystem.Security;
@@ -8,45 +12,84 @@ public static class IdentitySeeder
     {
         using var scope = services.CreateScope();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
 
-        foreach (var roleName in new[] { "Owner", "Employee" })
+        string[] roles = { "Owner", "Employee" };
+        foreach (var role in roles)
         {
-            if (!await roleManager.RoleExistsAsync(roleName))
+            if (!await roleManager.RoleExistsAsync(role))
             {
-                var roleResult = await roleManager.CreateAsync(new IdentityRole(roleName));
-                if (!roleResult.Succeeded)
-                    throw new InvalidOperationException(string.Join("; ", roleResult.Errors.Select(e => e.Description)));
+                await roleManager.CreateAsync(new IdentityRole(role));
             }
         }
 
-        // Supply these values through user-secrets. Never place the initial password in appsettings.json.
-        var email = configuration["InitialOwner:Email"];
-        var password = configuration["InitialOwner:Password"];
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
-            return;
+        var ownerEmail = (configuration["InitialOwner:Email"] ?? "owner@beancrate.local").Trim();
+        var ownerPassword = configuration["InitialOwner:Password"] ?? "BeanCrateOwner2026!";
 
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
-        var owner = await userManager.FindByEmailAsync(email);
-
-        if (owner == null)
+        if (!string.IsNullOrWhiteSpace(ownerEmail) && !string.IsNullOrWhiteSpace(ownerPassword))
         {
-            owner = new IdentityUser
+            // Remove any leftover Owner accounts whose email no longer matches InitialOwner:Email
+            var existingOwners = await userManager.GetUsersInRoleAsync("Owner");
+            foreach (var staleOwner in existingOwners)
             {
-                UserName = email.Trim(),
-                Email = email.Trim(),
-                EmailConfirmed = true
-            };
+                if (!string.Equals(staleOwner.Email, ownerEmail, StringComparison.OrdinalIgnoreCase))
+                {
+                    await userManager.DeleteAsync(staleOwner);
+                }
+            }
 
-            var createResult = await userManager.CreateAsync(owner, password);
-            if (!createResult.Succeeded)
-                throw new InvalidOperationException(string.Join("; ", createResult.Errors.Select(e => e.Description)));
+            var ownerUser = await userManager.FindByEmailAsync(ownerEmail);
+            if (ownerUser == null)
+            {
+                ownerUser = new IdentityUser
+                {
+                    UserName = ownerEmail,
+                    Email = ownerEmail,
+                    EmailConfirmed = true
+                };
+
+                var createResult = await userManager.CreateAsync(ownerUser, ownerPassword);
+                if (createResult.Succeeded)
+                {
+                    await userManager.AddToRoleAsync(ownerUser, "Owner");
+                }
+            }
+            else if (!await userManager.IsInRoleAsync(ownerUser, "Owner"))
+            {
+                await userManager.AddToRoleAsync(ownerUser, "Owner");
+            }
         }
 
-        if (!await userManager.IsInRoleAsync(owner, "Owner"))
+        // Seed a dedicated Employee (Staff) demo account if none exists yet
+        var staffEmail = (configuration["InitialEmployee:Email"] ?? "staff@beancrate.local").Trim();
+        var staffPassword = configuration["InitialEmployee:Password"] ?? "BeanCrateStaff2026!";
+
+        if (!string.IsNullOrWhiteSpace(staffEmail) && !string.IsNullOrWhiteSpace(staffPassword))
         {
-            var addRoleResult = await userManager.AddToRoleAsync(owner, "Owner");
-            if (!addRoleResult.Succeeded)
-                throw new InvalidOperationException(string.Join("; ", addRoleResult.Errors.Select(e => e.Description)));
+            var existingEmployees = await userManager.GetUsersInRoleAsync("Employee");
+            if (existingEmployees.Count == 0)
+            {
+                var staffUser = await userManager.FindByEmailAsync(staffEmail);
+                if (staffUser == null)
+                {
+                    staffUser = new IdentityUser
+                    {
+                        UserName = staffEmail,
+                        Email = staffEmail,
+                        EmailConfirmed = true
+                    };
+
+                    var staffResult = await userManager.CreateAsync(staffUser, staffPassword);
+                    if (staffResult.Succeeded)
+                    {
+                        await userManager.AddToRoleAsync(staffUser, "Employee");
+                    }
+                }
+                else if (!await userManager.IsInRoleAsync(staffUser, "Employee"))
+                {
+                    await userManager.AddToRoleAsync(staffUser, "Employee");
+                }
+            }
         }
     }
 }

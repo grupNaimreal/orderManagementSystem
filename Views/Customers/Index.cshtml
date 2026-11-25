@@ -1,17 +1,23 @@
 @*
     Views/Customers/Index.cshtml
-    PC Customer Sessions & Table Directory for QRDER (Bean Crate Cafe):
-    - Displays active vs. expired session counts, quick status filter tabs,
-      and live AJAX search ordered newest-first.
+    PC & Tablet Landscape Customer Sessions Directory for QRDER (Bean Crate Cafe):
+    - Evaluates active vs. expired sessions using both IsActive and the 10-minute
+      inactivity window, with quick status filter tabs, live AJAX search, and
+      automatic 10-second background sync so new table scans appear automatically.
 *@
 @model IEnumerable<orderManagementSystem.Models.Customer>
 
 @{
     ViewData["Title"] = "Customer Sessions";
     var customerList = Model.ToList();
+    var activeCutoff = DateTime.UtcNow.AddMinutes(-10);
+
+    bool IsCurrentlyActive(orderManagementSystem.Models.Customer c) =>
+        c.IsActive && DateTime.SpecifyKind(c.LastActivityUtc, DateTimeKind.Utc) >= activeCutoff;
+
     var totalCount = customerList.Count;
-    var activeCount = customerList.Count(c => c.IsActive);
-    var expiredCount = customerList.Count(c => !c.IsActive);
+    var activeCount = customerList.Count(IsCurrentlyActive);
+    var expiredCount = totalCount - activeCount;
 }
 
 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
@@ -23,8 +29,12 @@
         </p>
     </div>
 
-    <div>
-        <a asp-action="Create" class="btn menu-btn px-4 py-2 fw-semibold">
+    <div class="flex-shrink-0 d-flex align-items-center gap-2">
+        <span class="small text-muted d-none d-sm-inline-flex align-items-center gap-1 me-1"
+              title="Automatically checks for new table scans and expired sessions">
+            <span class="text-success">&#9679;</span> Live Sessions
+        </span>
+        <a asp-action="Create" class="btn menu-btn px-4 py-2 fw-bold text-nowrap">
             + New Customer Session
         </a>
     </div>
@@ -33,20 +43,20 @@
 <div class="row g-3 mb-4">
     <div class="col-4">
         <div class="qrder-callout">
-            <div class="small text-muted">Total Sessions</div>
-            <div class="fs-4 fw-bold mt-1">@totalCount</div>
+            <div class="small text-muted fw-bold">Total Sessions</div>
+            <div class="fs-4 fw-bold mt-1" id="kpiTotalSessions">@totalCount</div>
         </div>
     </div>
     <div class="col-4">
         <div class="qrder-callout">
-            <div class="small text-muted">Active Now</div>
-            <div class="fs-4 fw-bold mt-1 text-success">@activeCount</div>
+            <div class="small text-muted fw-bold">Active Now</div>
+            <div class="fs-4 fw-bold mt-1 text-success" id="kpiActiveSessions">@activeCount</div>
         </div>
     </div>
     <div class="col-4">
         <div class="qrder-callout">
-            <div class="small text-muted">Ended / Expired</div>
-            <div class="fs-4 fw-bold mt-1 text-muted">@expiredCount</div>
+            <div class="small text-muted fw-bold">Ended / Expired</div>
+            <div class="fs-4 fw-bold mt-1 text-muted" id="kpiExpiredSessions">@expiredCount</div>
         </div>
     </div>
 </div>
@@ -54,13 +64,13 @@
 <div class="qrder-card">
     <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
         <div class="d-flex flex-wrap gap-2" id="sessionFilterTabs" role="group" aria-label="Filter sessions">
-            <button type="button" class="btn btn-sm menu-btn px-3" data-session-filter="all">
+            <button type="button" class="btn btn-sm menu-btn px-3 text-nowrap" data-session-filter="all">
                 All (@totalCount)
             </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-session-filter="active">
+            <button type="button" class="btn btn-sm btn-outline-secondary px-3 text-nowrap" data-session-filter="active">
                 Active (@activeCount)
             </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-session-filter="inactive">
+            <button type="button" class="btn btn-sm btn-outline-secondary px-3 text-nowrap" data-session-filter="inactive">
                 Ended / Expired (@expiredCount)
             </button>
         </div>
@@ -79,13 +89,13 @@
         <table class="table table-hover align-middle stack-table mb-0" id="customerTable">
             <thead>
                 <tr>
-                    <th>Customer / Table</th>
-                    <th>Session Status</th>
-                    <th>Last Activity (PHT)</th>
-                    <th class="text-end">Actions</th>
+                    <th class="text-nowrap">Customer / Table</th>
+                    <th class="text-nowrap">Session Status</th>
+                    <th class="text-nowrap">Last Activity (PHT)</th>
+                    <th class="text-end text-nowrap">Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="customerTableBody">
                 <partial name="_CustomerRows" model="Model" />
             </tbody>
         </table>
@@ -96,7 +106,7 @@
     <script>
         (() => {
             const input = document.getElementById("customerSearch");
-            const body = document.querySelector("#customerTable tbody");
+            const body = document.getElementById("customerTableBody");
             const filterBtns = document.querySelectorAll("[data-session-filter]");
             let activeFilter = "all";
             let timer;
@@ -105,12 +115,13 @@
             function applyRowFilter() {
                 if (!body) return;
                 body.querySelectorAll("tr").forEach(row => {
-                    const text = row.textContent.toLowerCase();
-                    const isInactive = text.includes("inactive") || text.includes("expired") || text.includes("ended");
+                    const state = row.getAttribute("data-session-state") || "";
+                    if (!state) return;
+
                     const show =
                         activeFilter === "all" ||
-                        (activeFilter === "active" && !isInactive) ||
-                        (activeFilter === "inactive" && isInactive);
+                        (activeFilter === "active" && state === "active") ||
+                        (activeFilter === "inactive" && state === "inactive");
                     row.classList.toggle("d-none", !show);
                 });
             }
@@ -145,6 +156,51 @@
                     }
                 }, 250);
             });
+
+            // Background sync every 10s when not actively typing in search
+            async function syncCustomerSessions() {
+                if (document.hidden || document.activeElement === input || (input && input.value.trim().length > 0)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(window.location.href, {
+                        headers: { "X-Requested-With": "XMLHttpRequest" },
+                        cache: "no-store"
+                    });
+                    if (!response.ok) return;
+
+                    const html = await response.text();
+                    const doc = new DOMParser().parseFromString(html, "text/html");
+                    const nextBody = doc.getElementById("customerTableBody");
+                    if (!nextBody || !body) return;
+
+                    ["kpiTotalSessions", "kpiActiveSessions", "kpiExpiredSessions"].forEach(id => {
+                        const cur = document.getElementById(id);
+                        const nxt = doc.getElementById(id);
+                        if (cur && nxt && cur.textContent !== nxt.textContent) {
+                            cur.textContent = nxt.textContent;
+                        }
+                    });
+
+                    ["all", "active", "inactive"].forEach(key => {
+                        const curTab = document.querySelector(`[data-session-filter="${key}"]`);
+                        const nxtTab = doc.querySelector(`[data-session-filter="${key}"]`);
+                        if (curTab && nxtTab && curTab.textContent !== nxtTab.textContent) {
+                            curTab.textContent = nxtTab.textContent;
+                        }
+                    });
+
+                    if (body.innerHTML !== nextBody.innerHTML) {
+                        body.innerHTML = nextBody.innerHTML;
+                        applyRowFilter();
+                    }
+                } catch {
+                    // Retry silently on next tick
+                }
+            }
+
+            setInterval(syncCustomerSessions, 10000);
         })();
     </script>
 }

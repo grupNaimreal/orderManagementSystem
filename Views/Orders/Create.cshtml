@@ -5,10 +5,11 @@
       * Top Customer / Table Session selector + right-hand sticky Live Counter Ticket.
       * Same visual Category Picker -> 1:1 Product Cards -> Variant/Add-on Customizer
         flow used by customers, feeding directly into the live counter ticket.
-    - Customer Mobile Mode (Model.IsStaffOrder == false):
-      * Each item displays its corresponding photo on the left side.
-      * Pre-selected items are locked (read-only summary) unless the customer clicks "Edit".
-      * Responsive mobile card headers prevent long product names from overflowing narrow viewports.
+    - Customer Mobile & Tablet Landscape Mode (Model.IsStaffOrder == false):
+      * 2-column split checkout on Tablet Landscape & Desktop (md+):
+        Left (col-md-7): Itemized order ticket cards with photos & overflow protection.
+        Right (col-md-5): Sticky Payment & Checkout Ticket (Cash vs. Online Checkout via Maya,
+        Chosen Payment banner, Estimated Total, and Submit actions).
 *@
 @using System.Text.Json
 @model orderManagementSystem.Models.OrderCreateViewModel
@@ -28,7 +29,6 @@
 }
 
 <style>
-    /* Bootstrap 5 does not define .min-w-0; explicit rule lets flex children shrink & wrap */
     .min-w-0 {
         min-width: 0 !important;
     }
@@ -44,11 +44,11 @@
         position: relative;
         width: 80px;
         height: 80px;
-        border-radius: 12px;
+        border-radius: var(--qrder-radius, 4px);
         overflow: hidden;
         flex-shrink: 0;
         background-color: var(--qrder-cream-soft);
-        border: 1px solid var(--qrder-border);
+        border: 2px solid var(--qrder-border-strong, #2b1d16);
     }
 
     @@media (max-width: 420px) {
@@ -85,9 +85,12 @@
     }
 
     .item-header-name {
+        display: block;
+        width: 100%;
+        max-width: 100%;
         min-width: 0;
-        overflow-wrap: anywhere;
-        word-break: break-word;
+        overflow-wrap: break-word;
+        word-break: normal;
         line-height: 1.25;
     }
 
@@ -97,59 +100,63 @@
     }
 
     .qrder-pay-choice {
-        border: 2px solid var(--qrder-border);
-        border-radius: 14px;
+        border: 2px solid var(--qrder-border-strong, #2b1d16);
+        border-radius: var(--qrder-radius, 4px);
         background-color: var(--qrder-surface);
-        padding: 0.95rem 1rem;
+        padding: 0.9rem 0.95rem;
         text-align: left;
         cursor: pointer;
-        transition: border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+        box-shadow: 3px 3px 0px var(--qrder-shadow-color, #2b1d16);
+        transition: transform 0.12s ease, background-color 0.14s ease, box-shadow 0.12s ease;
         width: 100%;
         height: 100%;
     }
 
     .qrder-pay-choice:hover {
-        border-color: var(--qrder-espresso);
+        transform: translate(-1px, -1px);
+        box-shadow: 4px 4px 0px var(--qrder-shadow-color, #2b1d16);
     }
 
     .qrder-pay-choice.active {
-        border-color: var(--qrder-espresso);
         background-color: var(--qrder-cream-soft);
-        box-shadow: 0 4px 14px rgba(54, 36, 28, 0.10);
+        border-color: var(--qrder-amber, #C05800);
+        box-shadow: 4px 4px 0px var(--qrder-amber, #C05800);
     }
 
     .qrder-pay-selected-pill {
-        background-color: var(--qrder-espresso);
-        color: #f6efe6;
-        font-size: 0.7rem;
+        background-color: var(--qrder-roast, #4A1C05);
+        color: #fffaf3;
+        border: 1.5px solid var(--qrder-border-strong, #2b1d16);
+        font-size: 0.68rem;
         letter-spacing: 0.06em;
         text-transform: uppercase;
     }
 
-    /* Staff Visual Menu Picker Cards (Matches Customer Menu Experience) */
+    /* Staff Visual Menu Picker Cards (Roastery Press Editorial Style) */
     .staff-cat-card {
-        border: 1px solid var(--qrder-border);
-        border-radius: 14px;
+        border: 2px solid var(--qrder-border-strong, #2b1d16);
+        border-radius: var(--qrder-radius, 4px);
         background: var(--qrder-surface);
         padding: 0.95rem 0.75rem;
         text-align: center;
         cursor: pointer;
-        transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+        box-shadow: 3px 3px 0px var(--qrder-shadow-color, #2b1d16);
+        transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.14s ease;
         height: 100%;
     }
 
     .staff-cat-card:hover {
-        transform: translateY(-2px);
-        border-color: var(--qrder-espresso);
-        box-shadow: 0 6px 16px rgba(54, 36, 28, 0.10);
+        transform: translate(-1px, -1px);
+        background-color: var(--qrder-cream-soft);
+        box-shadow: 4px 4px 0px var(--qrder-shadow-color, #2b1d16);
     }
 
     .staff-cat-icon {
         width: 44px;
         height: 44px;
-        border-radius: 12px;
+        border-radius: var(--qrder-radius, 4px);
         background-color: var(--qrder-cream-soft);
-        border: 1px solid var(--qrder-border);
+        border: 1.5px solid var(--qrder-border-strong, #2b1d16);
         color: #4A1C05;
         display: inline-flex;
         align-items: center;
@@ -163,13 +170,14 @@
     }
 
     .staff-prod-card {
-        border: 1px solid var(--qrder-border);
-        border-radius: 14px;
+        border: 2px solid var(--qrder-border-strong, #2b1d16);
+        border-radius: var(--qrder-radius, 4px);
         background: var(--qrder-surface);
         overflow: hidden;
         cursor: pointer;
         text-align: left;
-        transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+        box-shadow: 3px 3px 0px var(--qrder-shadow-color, #2b1d16);
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
         height: 100%;
         display: flex;
         flex-direction: column;
@@ -177,9 +185,8 @@
     }
 
     .staff-prod-card:hover {
-        transform: translateY(-2px);
-        border-color: var(--qrder-espresso);
-        box-shadow: 0 6px 18px rgba(54, 36, 28, 0.12);
+        transform: translate(-1px, -1px);
+        box-shadow: 4px 4px 0px var(--qrder-shadow-color, #2b1d16);
     }
 
     .staff-prod-square {
@@ -188,6 +195,7 @@
         aspect-ratio: 1 / 1;
         overflow: hidden;
         background: var(--qrder-cream-soft);
+        border-bottom: 2px solid var(--qrder-border-strong, #2b1d16);
     }
 
     .staff-prod-square img {
@@ -219,10 +227,10 @@
         position: relative;
         width: 96px;
         height: 96px;
-        border-radius: 14px;
+        border-radius: var(--qrder-radius, 4px);
         overflow: hidden;
         flex-shrink: 0;
-        border: 1px solid var(--qrder-border);
+        border: 2px solid var(--qrder-border-strong, #2b1d16);
         background: var(--qrder-cream-soft);
     }
 
@@ -276,15 +284,15 @@
 <form asp-controller="Orders" asp-action="@actionName" method="post" id="qrderOrderForm">
     <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
-    <div class="row g-4">
-        @* Primary Column: Customer/Payment Setup, Staff Visual Menu Picker & Line Items *@
-        <div class="@(Model.IsStaffOrder ? "col-lg-8" : "col-12")">
-            <div class="qrder-card mb-4">
-                @if (Model.IsStaffOrder)
-                {
+    @if (Model.IsStaffOrder)
+    {
+        <div class="row g-4">
+            @* Staff Primary Column *@
+            <div class="col-md-7 col-lg-8">
+                <div class="qrder-card mb-4">
                     <div class="d-flex align-items-center justify-content-between mb-2">
                         <label asp-for="CustomerId" class="form-label fw-bold mb-0">Customer / Table Session</label>
-                        <a asp-controller="Customers" asp-action="Create" class="small text-decoration-none">
+                        <a asp-controller="Customers" asp-action="Create" class="small fw-bold text-decoration-none">
                             Create new session &rarr;
                         </a>
                     </div>
@@ -296,29 +304,148 @@
                         }
                     </select>
                     <span asp-validation-for="CustomerId" class="text-danger small"></span>
-                }
-                else
-                {
-                    var initialMethod = string.Equals(Model.PaymentMethod, "Maya", StringComparison.OrdinalIgnoreCase)
-                        ? "Maya"
-                        : "Cash";
+                </div>
 
+                @if (Model.Products.Count > 0)
+                {
+                    <div class="qrder-card mb-4" id="staffVisualMenuBrowser">
+                        <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-3">
+                            <div>
+                                <div class="qrder-eyebrow">STEP 1 &middot; SELECT ITEMS</div>
+                                <h2 class="h5 fw-bold mb-0">Browse Menu</h2>
+                            </div>
+                            <div style="min-width: 220px;">
+                                <input type="search"
+                                       id="staffMenuSearchInput"
+                                       class="form-control form-control-sm"
+                                       placeholder="Search drinks, meals, desserts..."
+                                       aria-label="Search menu items" />
+                            </div>
+                        </div>
+
+                        <div id="staffCategoryView">
+                            <div class="small text-muted fw-bold text-uppercase mb-2" style="letter-spacing: 0.08em;">
+                                Select a Category
+                            </div>
+                            <div class="row g-2" id="staffCategoryGrid"></div>
+                        </div>
+
+                        <div id="staffProductView" class="d-none">
+                            <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+                                <button type="button" id="staffBackToCatsBtn" class="btn btn-sm btn-outline-secondary px-3">
+                                    &larr; All Categories
+                                </button>
+                                <span class="fw-bold small" id="staffActiveCatLabel"></span>
+                            </div>
+                            <div class="row g-3" id="staffProductGrid"></div>
+                        </div>
+                    </div>
+                }
+
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h2 class="h5 fw-bold mb-0">Current Order Items</h2>
+                </div>
+
+                <div id="order-items" class="mb-3"></div>
+
+                <div id="staffEmptyItemsHint" class="qrder-callout text-center py-4 mb-3">
+                    <div class="fw-bold mb-1">No items added yet</div>
+                    <div class="small text-muted">
+                        Choose a category above and tap any product card to customize and add it to this order.
+                    </div>
+                </div>
+            </div>
+
+            @* Staff Sticky Right Ticket *@
+            <div class="col-md-5 col-lg-4">
+                <div class="qrder-card sticky-top" style="top: 1.25rem;">
+                    <div class="qrder-eyebrow">LIVE COUNTER TICKET</div>
+                    <h2 class="h5 fw-bold mb-3">Order Summary</h2>
+
+                    <div id="liveSummaryList" class="small mb-3">
+                        <p class="text-muted mb-0">Select products on the left to build the order.</p>
+                    </div>
+
+                    <hr class="qrder-ticket-divider" />
+
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between small text-muted mb-1">
+                            <span>Total Items</span>
+                            <span id="liveItemCount" class="fw-bold">0</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="fw-bold">Estimated Total</span>
+                            <span class="fs-4 fw-bold" style="color: var(--qrder-roast);" id="liveOrderTotal">₱0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit"
+                                id="staffSubmitOrderBtn"
+                                class="btn menu-btn py-2 fw-bold"
+                                disabled="@(Model.Products.Count == 0)">
+                            Submit Counter Order
+                        </button>
+                        <a asp-action="Index" class="btn btn-outline-secondary py-2">
+                            Cancel
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        var initialMethod = string.Equals(Model.PaymentMethod, "Maya", StringComparison.OrdinalIgnoreCase)
+            ? "Maya"
+            : "Cash";
+
+        @* Customer Split Checkout: 2-Column on Tablet Landscape & Desktop (md+), Stacked on Mobile *@
+        <div class="row g-4 align-items-start">
+            @* Left Column (col-md-7): Itemized Order Ticket List *@
+            <div class="col-12 col-md-7">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h2 class="h5 fw-bold mb-0">Order Items</h2>
+                    <a asp-controller="Products" asp-action="Index" class="btn btn-sm menu-btn px-3 fw-bold">
+                        + Add More Items
+                    </a>
+                </div>
+
+                <div id="order-items" class="mb-2"></div>
+
+                <div id="customerEmptyItemsHint" class="qrder-callout text-center py-4 mb-3 d-none">
+                    <div class="fw-bold mb-1">Your order is currently empty</div>
+                    <div class="small text-muted mb-3">
+                        Tap below to browse Bean Crate Cafe&rsquo;s menu and add items to your ticket.
+                    </div>
+                    <a asp-controller="Products" asp-action="Index" class="btn btn-sm menu-btn px-3 fw-bold">
+                        + Add More Items
+                    </a>
+                </div>
+            </div>
+
+            @* Right Column (col-md-5): Sticky Payment & Checkout Ticket *@
+            <div class="col-12 col-md-5">
+                <div class="qrder-card sticky-top" style="top: 5.25rem;">
                     <input type="hidden" asp-for="PaymentMethod" id="customerPaymentMethod" value="@initialMethod" />
 
                     <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                        <span class="form-label fw-bold mb-0">Payment Method</span>
-                        <span class="small text-muted">Tap to switch</span>
+                        <div>
+                            <div class="qrder-eyebrow">CHECKOUT TICKET</div>
+                            <h2 class="h5 fw-bold mb-0">Payment Method</h2>
+                        </div>
+                        <span class="small text-muted fst-italic">Tap to switch</span>
                     </div>
 
                     <div class="row g-2 mb-3" role="radiogroup" aria-label="Choose Payment Method">
-                        <div class="col-sm-6">
+                        <div class="col-12 col-sm-6 col-md-12">
                             <button type="button"
                                     class="qrder-pay-choice @(initialMethod == "Cash" ? "active" : "")"
                                     data-pay-option="Cash"
                                     aria-pressed="@(initialMethod == "Cash" ? "true" : "false")">
                                 <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
                                     <span class="fw-bold">Cash at Counter</span>
-                                    <span class="badge rounded-pill qrder-pay-selected-pill @(initialMethod == "Cash" ? "" : "d-none")"
+                                    <span class="badge qrder-pay-selected-pill @(initialMethod == "Cash" ? "" : "d-none")"
                                           data-pay-badge="Cash">
                                         Selected
                                     </span>
@@ -329,14 +456,14 @@
                             </button>
                         </div>
 
-                        <div class="col-sm-6">
+                        <div class="col-12 col-sm-6 col-md-12">
                             <button type="button"
                                     class="qrder-pay-choice @(initialMethod == "Maya" ? "active" : "")"
                                     data-pay-option="Maya"
                                     aria-pressed="@(initialMethod == "Maya" ? "true" : "false")">
                                 <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
                                     <span class="fw-bold">Online Checkout (via Maya)</span>
-                                    <span class="badge rounded-pill qrder-pay-selected-pill @(initialMethod == "Maya" ? "" : "d-none")"
+                                    <span class="badge qrder-pay-selected-pill @(initialMethod == "Maya" ? "" : "d-none")"
                                           data-pay-badge="Maya">
                                         Selected
                                     </span>
@@ -348,9 +475,9 @@
                         </div>
                     </div>
 
-                    <div id="chosenPaymentBanner" class="qrder-callout py-2 px-3 mb-0">
+                    <div id="chosenPaymentBanner" class="qrder-callout py-2 px-3 mb-3">
                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-1">
-                            <span class="small text-muted">Chosen Payment Method:</span>
+                            <span class="small text-muted">Chosen Method:</span>
                             <span class="fw-bold" id="chosenPaymentTitle">
                                 @(initialMethod == "Maya" ? "Online Checkout (via Maya)" : "Cash at Counter")
                             </span>
@@ -362,134 +489,33 @@
                         </div>
                     </div>
 
-                    <span asp-validation-for="PaymentMethod" class="text-danger small"></span>
-                }
-            </div>
+                    <span asp-validation-for="PaymentMethod" class="text-danger small d-block mb-2"></span>
 
-            @* Staff Counter Mode: Same Visual Category -> Product Card -> Customizer Picker as Customers *@
-            @if (Model.IsStaffOrder && Model.Products.Count > 0)
-            {
-                <div class="qrder-card mb-4" id="staffVisualMenuBrowser">
-                    <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-3">
-                        <div>
-                            <div class="qrder-eyebrow">STEP 1 &middot; SELECT ITEMS</div>
-                            <h2 class="h5 fw-bold mb-0">Browse Menu</h2>
-                        </div>
-                        <div style="min-width: 230px;">
-                            <input type="search"
-                                   id="staffMenuSearchInput"
-                                   class="form-control form-control-sm"
-                                   placeholder="Search drinks, meals, desserts..."
-                                   aria-label="Search menu items" />
-                        </div>
-                    </div>
+                    <hr class="qrder-ticket-divider" />
 
-                    <div id="staffCategoryView">
-                        <div class="small text-muted fw-semibold text-uppercase mb-2" style="letter-spacing: 0.06em;">
-                            Select a Category
+                    <div class="mb-3">
+                            <div class="d-flex justify-content-between small text-muted mb-1">
+                                <span>Total Items</span>
+                                <span id="customerLiveItemCount" class="fw-bold qrder-tabular">0</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-bold">Estimated Total</span>
+                                <span class="fs-4 fw-bold qrder-tabular" style="color: var(--qrder-roast);" id="mobileLiveTotal">₱0.00</span>
+                            </div>
                         </div>
-                        <div class="row g-2" id="staffCategoryGrid"></div>
-                    </div>
 
-                    <div id="staffProductView" class="d-none">
-                        <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
-                            <button type="button" id="staffBackToCatsBtn" class="btn btn-sm btn-outline-secondary px-3">
-                                &larr; All Categories
+                        <div class="d-grid">
+                            <button type="submit"
+                                    id="customerSubmitOrderBtn"
+                                    class="btn menu-btn py-2 fw-bold"
+                                    disabled="@(Model.Products.Count == 0)">
+                                Submit Cash Order
                             </button>
-                            <span class="fw-bold small" id="staffActiveCatLabel"></span>
                         </div>
-                        <div class="row g-3" id="staffProductGrid"></div>
-                    </div>
-                </div>
-            }
-
-            <div class="d-flex align-items-center justify-content-between mb-3">
-                <h2 class="h5 fw-bold mb-0">
-                    @(Model.IsStaffOrder ? "Current Order Items" : "Order Items")
-                </h2>
-                @if (!Model.IsStaffOrder)
-                {
-                    <button type="button" id="add-item-top" class="btn btn-sm menu-btn px-3 fw-semibold">
-                        + Add Item
-                    </button>
-                }
-            </div>
-
-            <div id="order-items" class="mb-3"></div>
-
-            @if (Model.IsStaffOrder)
-            {
-                <div id="staffEmptyItemsHint" class="qrder-callout text-center py-4 mb-3">
-                    <div class="fw-semibold mb-1">No items added yet</div>
-                    <div class="small text-muted">
-                        Choose a category above and tap any product card to customize and add it to this order.
-                    </div>
-                </div>
-            }
-
-            @if (!Model.IsStaffOrder)
-            {
-                <div class="qrder-callout mb-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="small text-muted">Estimated Total</span>
-                        <span class="fs-5 fw-bold" id="mobileLiveTotal">₱0.00</span>
-                    </div>
-                </div>
-
-                <div class="d-grid gap-2">
-                    <button type="submit"
-                            id="customerSubmitOrderBtn"
-                            class="btn menu-btn py-2 fw-semibold"
-                            disabled="@(Model.Products.Count == 0)">
-                        Submit Cash Order
-                    </button>
-                    <a asp-controller="Products"
-                       asp-action="Index"
-                       class="btn btn-outline-secondary py-2">
-                        Back to Menu
-                    </a>
-                </div>
-            }
-        </div>
-
-        @* Right Sticky Summary Panel (PC Staff Counter Mode) *@
-        @if (Model.IsStaffOrder)
-        {
-            <div class="col-lg-4">
-                <div class="qrder-card sticky-top" style="top: 1.25rem;">
-                    <div class="qrder-eyebrow">LIVE COUNTER TICKET</div>
-                    <h2 class="h5 fw-bold mb-3">Order Summary</h2>
-
-                    <div id="liveSummaryList" class="small mb-3">
-                        <p class="text-muted mb-0">Select products on the left to build the order.</p>
-                    </div>
-
-                    <div class="border-top pt-3 mb-4">
-                        <div class="d-flex justify-content-between small text-muted mb-1">
-                            <span>Total Items</span>
-                            <span id="liveItemCount">0</span>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-bold">Estimated Total</span>
-                            <span class="fs-4 fw-bold" id="liveOrderTotal">₱0.00</span>
-                        </div>
-                    </div>
-
-                    <div class="d-grid gap-2">
-                        <button type="submit"
-                                id="staffSubmitOrderBtn"
-                                class="btn menu-btn py-2 fw-semibold"
-                                disabled="@(Model.Products.Count == 0)">
-                            Submit Counter Order
-                        </button>
-                        <a asp-action="Index" class="btn btn-outline-secondary py-2">
-                            Cancel
-                        </a>
                     </div>
                 </div>
             </div>
         }
-    </div>
 </form>
 
 @* Staff Product Customization Modal (Matches Customer Product Details Flow) *@
@@ -497,7 +523,7 @@
 {
     <div class="modal fade" id="staffCustomizeModal" tabindex="-1" aria-labelledby="staffModalProductName" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content" style="background-color: var(--qrder-surface); color: var(--qrder-ink); border-radius: 18px; border: 1px solid var(--qrder-border);">
+            <div class="modal-content" style="background-color: var(--qrder-surface); color: var(--qrder-ink); border-radius: var(--qrder-radius, 4px); border: 2px solid var(--qrder-border-strong); box-shadow: 6px 6px 0px #2b1d16;">
                 <div class="modal-header border-bottom">
                     <div class="d-flex align-items-center gap-3 min-w-0">
                         <div class="staff-modal-thumb">
@@ -505,13 +531,13 @@
                             <div id="staffModalFallback" class="qrder-order-thumb-fallback">Item</div>
                         </div>
                         <div class="min-w-0">
-                            <span class="badge rounded-pill mb-1"
+                            <span class="badge mb-1"
                                   id="staffModalCategory"
-                                  style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1px solid var(--qrder-border);">
+                                  style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1.5px solid var(--qrder-border-strong);">
                                 Category
                             </span>
                             <h3 class="h5 fw-bold mb-0 text-break" id="staffModalProductName">Product</h3>
-                            <div class="fw-bold mt-1" id="staffModalLivePrice">₱0.00</div>
+                            <div class="fw-bold mt-1" style="color: var(--qrder-roast);" id="staffModalLivePrice">₱0.00</div>
                         </div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -519,20 +545,20 @@
 
                 <div class="modal-body">
                     <div id="staffModalVariantWrap" class="mb-3 d-none">
-                        <label for="staffModalVariantSelect" class="form-label small fw-semibold mb-1">
+                        <label for="staffModalVariantSelect" class="form-label small fw-bold text-uppercase mb-1">
                             Choose Size / Variant
                         </label>
                         <select id="staffModalVariantSelect" class="form-select"></select>
                     </div>
 
                     <div id="staffModalAddOnsWrap" class="mb-3 d-none">
-                        <div class="form-label small fw-semibold mb-1">Optional Add-ons (Cheapest First)</div>
-                        <div id="staffModalAddOnsList" class="border rounded-3 p-2 d-flex flex-column gap-2" style="border-color: var(--qrder-border) !important;"></div>
+                        <div class="form-label small fw-bold text-uppercase mb-1">Optional Add-ons (Cheapest First)</div>
+                        <div id="staffModalAddOnsList" class="p-2 d-flex flex-column gap-2" style="background-color: var(--qrder-cream-soft); border: 2px solid var(--qrder-border-strong); border-radius: var(--qrder-radius, 4px);"></div>
                     </div>
 
                     <div>
-                        <label for="staffModalQtyInput" class="form-label small fw-semibold mb-1">Quantity</label>
-                        <div class="input-group" style="max-width: 160px;">
+                        <label for="staffModalQtyInput" class="form-label small fw-bold text-uppercase mb-1">Quantity</label>
+                        <div class="input-group" style="max-width: 175px;">
                             <button type="button" class="btn btn-outline-secondary" id="staffModalQtyMinus">&minus;</button>
                             <input type="number" id="staffModalQtyInput" class="form-control text-center fw-bold" value="1" min="1" max="99" />
                             <button type="button" class="btn btn-outline-secondary" id="staffModalQtyPlus">&#43;</button>
@@ -542,7 +568,7 @@
 
                 <div class="modal-footer border-top">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn menu-btn fw-semibold px-4" id="staffModalConfirmAddBtn">
+                    <button type="button" class="btn menu-btn fw-bold px-4" id="staffModalConfirmAddBtn">
                         Add to Counter Order
                     </button>
                 </div>
@@ -562,26 +588,27 @@
 
             @* Right Side: Header + Read-Only Summary View + Collapsible Editor *@
             <div class="flex-grow-1 min-w-0">
-                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 pb-2 mb-2 border-bottom min-w-0">
-                    <div class="d-flex flex-wrap align-items-center gap-2 min-w-0 flex-grow-1">
-                        <span class="badge rounded-pill flex-shrink-0"
-                              style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1px solid var(--qrder-border);"
+                <div class="pb-2 mb-2 min-w-0" style="border-bottom: 2px dashed var(--qrder-border);">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <span class="badge flex-shrink-0"
+                              style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1.5px solid var(--qrder-border-strong);"
                               data-row-badge>
                             Item #1
                         </span>
-                        <span class="fw-bold item-header-name">New Item</span>
+
+                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-secondary toggle-edit-item">
+                                Edit
+                            </button>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger remove-item">
+                                Remove
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                        <button type="button"
-                                class="btn btn-sm btn-outline-secondary toggle-edit-item">
-                            Edit
-                        </button>
-                        <button type="button"
-                                class="btn btn-sm btn-outline-danger remove-item">
-                            Remove
-                        </button>
-                    </div>
+                    <div class="fw-bold item-header-name mt-2">New Item</div>
                 </div>
 
                 @* Read-Only Summary View (Default when item is already chosen) *@
@@ -589,8 +616,8 @@
                     <div class="small text-muted mb-1 item-summary-variant">Variant: Standard</div>
                     <div class="small text-muted mb-2 item-summary-addons">Add-ons: None</div>
                     <div class="d-flex justify-content-between align-items-center gap-2">
-                        <span class="small fw-semibold item-summary-qty">Qty: 1</span>
-                        <span class="fw-bold item-summary-subtotal">₱0.00</span>
+                        <span class="small fw-bold item-summary-qty">Qty: 1</span>
+                        <span class="fw-bold fs-6 item-summary-subtotal" style="color: var(--qrder-roast);">₱0.00</span>
                     </div>
                 </div>
 
@@ -598,7 +625,7 @@
                 <div class="item-edit-panel d-none pt-1">
                     <div class="row g-3">
                         <div class="col-md-8">
-                            <label class="form-label small fw-semibold">Choose Product</label>
+                            <label class="form-label small fw-bold">Choose Product</label>
                             <select class="form-select form-select-sm product-select"
                                     name="Items[__index__].ProductId"
                                     required>
@@ -607,7 +634,7 @@
                         </div>
 
                         <div class="col-md-4">
-                            <label class="form-label small fw-semibold">Quantity</label>
+                            <label class="form-label small fw-bold">Quantity</label>
                             <input type="number"
                                    class="form-control form-control-sm quantity-input"
                                    name="Items[__index__].Quantity"
@@ -618,7 +645,7 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold">Variant (Optional)</label>
+                            <label class="form-label small fw-bold">Variant (Optional)</label>
                             <select class="form-select form-select-sm variant-select"
                                     name="Items[__index__].VariantOptionId">
                                 <option value="">No variant</option>
@@ -626,7 +653,7 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold">Add-ons (Cheapest First)</label>
+                            <label class="form-label small fw-bold">Add-ons (Cheapest First)</label>
                             <div class="addons-container small">
                                 <span class="text-muted">Choose a product first.</span>
                             </div>
@@ -651,9 +678,11 @@
         const container = document.getElementById("order-items");
         const template = document.getElementById("order-item-template");
         const staffEmptyItemsHint = document.getElementById("staffEmptyItemsHint");
+        const customerEmptyItemsHint = document.getElementById("customerEmptyItemsHint");
 
         const liveSummaryList = document.getElementById("liveSummaryList");
         const liveItemCount = document.getElementById("liveItemCount");
+        const customerLiveItemCount = document.getElementById("customerLiveItemCount");
         const liveOrderTotal = document.getElementById("liveOrderTotal");
         const mobileLiveTotal = document.getElementById("mobileLiveTotal");
         const cartStorageKey = "qrder_customer_cart";
@@ -849,6 +878,10 @@
                 staffEmptyItemsHint.classList.toggle("d-none", rows.length > 0);
             }
 
+            if (customerEmptyItemsHint) {
+                customerEmptyItemsHint.classList.toggle("d-none", rows.length > 0);
+            }
+
             rows.forEach((row, idx) => {
                 const parsed = updateRowDisplay(row, idx);
                 if (!parsed) {
@@ -868,10 +901,11 @@
                 }
 
                 const lineDiv = document.createElement("div");
-                lineDiv.className = "mb-2 pb-2 border-bottom";
+                lineDiv.className = "mb-2 pb-2";
+                lineDiv.style.borderBottom = "1px dashed var(--qrder-border)";
 
                 const topRow = document.createElement("div");
-                topRow.className = "d-flex justify-content-between gap-2 fw-semibold";
+                topRow.className = "d-flex justify-content-between gap-2 fw-bold";
 
                 const nameSpan = document.createElement("span");
                 nameSpan.className = "text-break";
@@ -886,7 +920,7 @@
 
                 if (parsed.optionNames.length > 0) {
                     const optDiv = document.createElement("div");
-                    optDiv.className = "text-muted";
+                    optDiv.className = "text-muted fst-italic";
                     optDiv.textContent = parsed.optionNames.join(", ");
                     lineDiv.appendChild(optDiv);
                 }
@@ -918,7 +952,7 @@
                 liveSummaryList.replaceChildren();
                 if (summaryFragments.length === 0) {
                     const emptyP = document.createElement("p");
-                    emptyP.className = "text-muted mb-0";
+                    emptyP.className = "text-muted fst-italic mb-0";
                     emptyP.textContent = "Select products on the left to build the order.";
                     liveSummaryList.appendChild(emptyP);
                 } else {
@@ -928,6 +962,10 @@
 
             if (liveItemCount) {
                 liveItemCount.textContent = String(totalQty);
+            }
+
+            if (customerLiveItemCount) {
+                customerLiveItemCount.textContent = String(totalQty);
             }
 
             if (liveOrderTotal) {
@@ -1206,7 +1244,6 @@
                     modalImg.src = meta.ImageUrl;
                 }
 
-                // Variants
                 modalVarSelect.replaceChildren();
                 const variants = product.Variants || [];
                 if (variants.length > 0) {
@@ -1228,7 +1265,6 @@
                     modalVarWrap.classList.add("d-none");
                 }
 
-                // Add-ons sorted cheapest first
                 modalAddOnsList.replaceChildren();
                 const addOns = [...(product.AddOns || [])].sort((a, b) =>
                     (Number(a.PriceAdjustment) - Number(b.PriceAdjustment)) ||
@@ -1310,7 +1346,7 @@
                         const visual = getCategoryVisual(meta.CategoryName);
 
                         const col = document.createElement("div");
-                        col.className = "col-6 col-sm-4 col-md-3";
+                        col.className = "col-6 col-sm-4 col-md-4 col-lg-3";
 
                         const card = document.createElement("button");
                         card.type = "button";
@@ -1400,7 +1436,7 @@
                     const visual = getCategoryVisual(catName);
 
                     const col = document.createElement("div");
-                    col.className = "col-6 col-sm-4 col-md-3";
+                    col.className = "col-6 col-sm-4 col-md-4 col-lg-3";
 
                     const btn = document.createElement("button");
                     btn.type = "button";

@@ -2,13 +2,24 @@
     Views/Customers/_CustomerRows.cshtml
     Partial table rows for Customer Sessions (Views/Customers/Index.cshtml)
     and live AJAX search (CustomersController.Search).
-    - Formats LastActivityUtc in Asia/Manila (PHT) to match the index header.
-    - Displays status pills compatible with the Active / Ended / Expired filter tabs.
+    - Evaluates real-time session validity (IsActive && LastActivityUtc within 10 minutes).
+    - Provides a direct "+ Order" shortcut on active sessions alongside Details, Edit, and End Session.
 *@
 @model IEnumerable<orderManagementSystem.Models.Customer>
 
 @{
-    var manilaTz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+    TimeZoneInfo ResolveManilaTimeZone()
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila"); }
+        catch
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time"); }
+            catch { return TimeZoneInfo.CreateCustomTimeZone("PHT", TimeSpan.FromHours(8), "Philippine Standard Time", "PHT"); }
+        }
+    }
+
+    var manilaTz = ResolveManilaTimeZone();
+    var activeCutoff = DateTime.UtcNow.AddMinutes(-10);
 }
 
 @if (!Model.Any())
@@ -23,52 +34,60 @@ else
 {
     @foreach (var item in Model)
     {
-        var localActivity = TimeZoneInfo.ConvertTimeFromUtc(
-            DateTime.SpecifyKind(item.LastActivityUtc, DateTimeKind.Utc),
-            manilaTz
-        );
+        var utcActivity = DateTime.SpecifyKind(item.LastActivityUtc, DateTimeKind.Utc);
+        var isCurrentlyActive = item.IsActive && utcActivity >= activeCutoff;
+        var localActivity = TimeZoneInfo.ConvertTimeFromUtc(utcActivity, manilaTz);
 
-        <tr>
-            <td data-label="Customer / Table" class="fw-semibold">
+        <tr data-session-state="@(isCurrentlyActive ? "active" : "inactive")">
+            <td data-label="Customer / Table" class="fw-bold">
                 @item.DisplayName
             </td>
             <td data-label="Session Status">
-                @if (item.IsActive)
+                @if (isCurrentlyActive)
                 {
-                    <span class="badge rounded-pill"
-                          style="background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;">
+                    <span class="badge"
+                          style="background-color: #d1e7dd; color: #0f5132; border: 1.5px solid #0f5132;">
                         Active
                     </span>
                 }
                 else
                 {
-                    <span class="badge rounded-pill"
-                          style="background-color: var(--qrder-cream-soft); color: var(--qrder-muted); border: 1px solid var(--qrder-border);">
+                    <span class="badge"
+                          style="background-color: var(--qrder-cream-soft); color: var(--qrder-muted); border: 1.5px solid var(--qrder-border-strong);">
                         Ended / Expired
                     </span>
                 }
             </td>
             <td data-label="Last Activity (PHT)">
-                <div>@localActivity.ToString("MMM dd, yyyy")</div>
+                <div class="fw-semibold">@localActivity.ToString("MMM dd, yyyy")</div>
                 <div class="small text-muted">@localActivity.ToString("hh:mm tt")</div>
             </td>
             <td data-label="Actions" class="text-end">
-                <div class="d-inline-flex flex-wrap justify-content-end gap-1">
+                <div class="d-inline-flex align-items-center justify-content-end gap-2">
+                    @if (isCurrentlyActive)
+                    {
+                        <a asp-controller="Orders"
+                           asp-action="CreateForCustomer"
+                           asp-route-customerId="@item.Id"
+                           class="btn btn-sm menu-btn text-nowrap">
+                            + Order
+                        </a>
+                    }
                     <a asp-action="Details"
                        asp-route-id="@item.Id"
-                       class="btn btn-sm btn-outline-secondary">
+                       class="btn btn-sm btn-outline-secondary text-nowrap">
                         Details
                     </a>
                     <a asp-action="Edit"
                        asp-route-id="@item.Id"
-                       class="btn btn-sm btn-outline-secondary">
+                       class="btn btn-sm btn-outline-secondary text-nowrap">
                         Edit
                     </a>
-                    @if (item.IsActive)
+                    @if (isCurrentlyActive)
                     {
                         <a asp-action="Delete"
                            asp-route-id="@item.Id"
-                           class="btn btn-sm btn-outline-danger">
+                           class="btn btn-sm btn-outline-danger text-nowrap">
                             End Session
                         </a>
                     }

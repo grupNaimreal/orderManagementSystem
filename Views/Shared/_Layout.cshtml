@@ -1,10 +1,11 @@
 @*
     Views/Shared/_Layout.cshtml
     Shared application shell for QRDER (Bean Crate Cafe):
-    - Owner / Employee (PC POS Workspace): Fixed left dark-brown sidebar with permanently
-      emphasized "+ New Order" action, upgraded Log Out button, and fluid cream workspace.
-    - Customer / Unauthenticated (Mobile-Priority, PC-Adaptive): Clean dark-espresso top bar
-      locked to Light Mode with QRDER logo and Login/Account controls.
+    - Loads full Source Serif 4 font weights (400-800 + italics) for unified editorial typography.
+    - Owner / Employee (PC & Tablet Landscape POS Workspace): Docked left dark-brown sidebar with
+      permanently emphasized "+ New Order" action, upgraded Log Out button, and fluid cream workspace.
+    - Customer / Unauthenticated (Mobile-Priority, Tablet Landscape & PC-Adaptive): Clean dark-espresso
+      top bar locked to Light Mode with QRDER logo, Admin/Staff Login, and brand social icons.
 *@
 @{
     var isOwner = User.IsInRole("Owner");
@@ -37,28 +38,28 @@
     <script type="importmap"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;0,8..60,700;0,8..60,800;1,8..60,400;1,8..60,600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/orderManagementSystem.styles.css" asp-append-version="true" />
     <style>
-        /* Permanent emphasis for + New Order in the staff POS sidebar */
+        /* Permanent Roastery Press emphasis for + New Order in the staff POS sidebar */
         .qrder-sidebar-nav .qrder-nav-item-featured {
-            background: linear-gradient(135deg, rgba(237, 224, 201, 0.22) 0%, rgba(192, 88, 0, 0.30) 100%);
-            border: 1px solid rgba(237, 224, 201, 0.48);
-            color: #fff8ef !important;
-            font-weight: 700;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
-            margin-top: 0.2rem;
-            margin-bottom: 0.35rem;
+            background-color: #C05800;
+            border: 2px solid #f6efe6;
+            color: #fffaf3 !important;
+            font-weight: 800;
+            box-shadow: 3px 3px 0px #000000;
+            margin-top: 0.25rem;
+            margin-bottom: 0.4rem;
         }
 
         .qrder-sidebar-nav .qrder-nav-item-featured .qrder-featured-plus {
             width: 22px;
             height: 22px;
-            border-radius: 6px;
-            background-color: #C05800;
-            color: #ffffff;
+            border-radius: 2px;
+            background-color: #ede0c9;
+            color: #2b1d16;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -71,9 +72,9 @@
         .qrder-sidebar-nav .qrder-nav-item-featured:hover,
         .qrder-sidebar-nav .qrder-nav-item-featured.active {
             background: #ede0c9 !important;
-            border-color: #ede0c9 !important;
+            border-color: #f6efe6 !important;
             color: #2b1d16 !important;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+            box-shadow: 3px 3px 0px #000000;
         }
 
         .qrder-sidebar-nav .qrder-nav-item-featured:hover .qrder-featured-plus,
@@ -94,13 +95,13 @@
 
         .qrder-sidebar-account .qrder-account-user-link {
             display: block;
-            padding: 0.4rem 0.65rem;
-            border-radius: 8px;
-            background-color: rgba(255, 255, 255, 0.07);
-            border: 1px solid rgba(255, 255, 255, 0.14);
+            padding: 0.42rem 0.65rem;
+            border-radius: var(--qrder-radius, 4px);
+            background-color: rgba(255, 255, 255, 0.08);
+            border: 1.5px solid rgba(237, 224, 201, 0.35);
             color: #f6efe6 !important;
             font-size: 0.78rem;
-            font-weight: 600;
+            font-weight: 700;
             text-decoration: none !important;
             white-space: nowrap;
             overflow: hidden;
@@ -109,7 +110,7 @@
         }
 
         .qrder-sidebar-account .qrder-account-user-link:hover {
-            background-color: rgba(255, 255, 255, 0.14);
+            background-color: rgba(255, 255, 255, 0.16);
             color: #ffffff !important;
         }
 
@@ -120,30 +121,101 @@
             justify-content: center;
             gap: 0.45rem;
             padding: 0.48rem 0.75rem;
-            border-radius: 10px;
-            background-color: rgba(220, 53, 69, 0.20);
-            border: 1px solid rgba(248, 113, 113, 0.48);
-            color: #ffd8dc !important;
+            border-radius: var(--qrder-radius, 4px) !important;
+            background-color: #a82330;
+            border: 2px solid #f6efe6;
+            color: #ffffff !important;
             font-size: 0.84rem;
-            font-weight: 700;
+            font-weight: 800;
             text-decoration: none !important;
-            transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+            box-shadow: 2px 2px 0px #000000;
+            transition: background-color 0.14s ease, transform 0.1s ease;
         }
 
         .qrder-sidebar-account .qrder-logout-btn:hover {
             background-color: #dc3545;
-            border-color: #dc3545;
             color: #ffffff !important;
+        }
+
+        /* Branded full-screen loading curtain for form submissions & redirects */
+        .qrder-loading-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2050;
+            background-color: rgba(30, 19, 14, 0.62);
+            backdrop-filter: blur(2px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .qrder-loading-card {
+            background-color: var(--qrder-surface, #fffdf9);
+            color: var(--qrder-ink, #221610);
+            border: 2px solid var(--qrder-border-strong, #2b1d16);
+            border-radius: var(--qrder-radius, 4px);
+            padding: 1.45rem 1.75rem;
+            text-align: center;
+            box-shadow: 6px 6px 0px #2b1d16;
+            max-width: 290px;
+            width: 100%;
+        }
+
+        .qrder-loading-pulse {
+            animation: qrderPulse 1.1s ease-in-out infinite;
+        }
+
+        @@keyframes qrderPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(0.92); opacity: 0.72; }
+        }
+
+        .qrder-social-icon-link {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--qrder-radius, 4px);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--qrder-surface);
+            border: 2px solid var(--qrder-border-strong);
+            color: var(--qrder-espresso);
+            box-shadow: 2px 2px 0px var(--qrder-shadow-color);
+            transition: transform 0.12s ease, background-color 0.14s ease, color 0.14s ease, box-shadow 0.12s ease;
+        }
+
+        .qrder-social-icon-link:hover {
+            background-color: var(--qrder-roast);
+            color: #fffaf3;
+            transform: translate(-1px, -1px);
+            box-shadow: 3px 3px 0px var(--qrder-shadow-color);
         }
     </style>
 </head>
 <body class="@bodyClass">
+    <div id="qrderLoadingOverlay"
+         class="qrder-loading-overlay d-none"
+         role="status"
+         aria-live="polite"
+         aria-hidden="true">
+        <div class="qrder-loading-card">
+            <img src="~/images/qrder-logo.svg"
+                 alt=""
+                 width="44"
+                 height="44"
+                 class="qrder-loading-pulse mb-2" />
+            <div class="fw-bold small" id="qrderLoadingText">Processing request...</div>
+            <div class="text-muted fst-italic" style="font-size: 0.78rem;">Please wait a moment</div>
+        </div>
+    </div>
+
     @if (isStaff)
     {
         <div class="qrder-sidebar-backdrop" id="sidebarBackdrop"></div>
 
         <div class="qrder-pos-shell">
-            <!-- Left Dark-Brown POS Sidebar (Desktop + Slide-over on Narrow Screens) -->
+            <!-- Left Dark-Brown POS Sidebar (Desktop, Tablet Landscape & Slide-over on Mobile) -->
             <aside class="qrder-sidebar" id="qrderSidebar" aria-label="Workspace Navigation">
                 <div class="qrder-sidebar-top">
                     <a class="qrder-brand-card" asp-controller="Home" asp-action="Index">
@@ -233,8 +305,8 @@
             </aside>
 
             <div class="qrder-pos-main">
-                @* Compact top bar shown only on narrow screens so the sidebar remains accessible *@
-                <header class="qrder-pos-topbar d-lg-none">
+                @* Compact top bar shown only on mobile (< 768px) *@
+                <header class="qrder-pos-topbar d-md-none">
                     <button type="button"
                             id="sidebarToggle"
                             class="btn btn-sm qrder-topbar-btn"
@@ -242,7 +314,7 @@
                         &#9776; Menu
                     </button>
                     <span class="qrder-wordmark-inline fw-bold">QRDER POS</span>
-                    <span class="badge rounded-pill qrder-role-pill">@(isOwner ? "Owner" : "Staff")</span>
+                    <span class="badge qrder-role-pill">@(isOwner ? "Owner" : "Staff")</span>
                 </header>
 
                 <main role="main" class="qrder-pos-content">
@@ -253,15 +325,15 @@
     }
     else
     {
-        @* Mobile-Priority, PC-Adaptive Customer Shell (Always Light Mode) *@
+        @* Mobile-Priority, Tablet Landscape & PC-Adaptive Customer Shell (Always Light Mode) *@
         <header class="qrder-mobile-header sticky-top">
             <div class="qrder-mobile-container d-flex align-items-center justify-content-between gap-2">
                 <a class="qrder-mobile-brand" asp-controller="Home" asp-action="Index">
                     <span class="qrder-mobile-logo-badge">
                         <img src="~/images/qrder-logo.svg"
                              alt="QRDER"
-                             width="24"
-                             height="24"
+                             width="26"
+                             height="26"
                              class="qrder-mobile-logo-icon" />
                     </span>
                     <span class="d-flex flex-column lh-1">
@@ -283,28 +355,42 @@
                 @RenderBody()
             </main>
 
-            <footer class="qrder-customer-footer text-center small text-muted py-3 border-top">
+            <footer class="qrder-customer-footer text-center small text-muted py-3">
                 <div class="mb-2">
-                    <span class="fw-semibold">Bean Crate Cafe</span> &middot; Antipolo City
+                    <span class="fw-bold text-dark">Bean Crate Cafe</span> &middot; <span class="fst-italic">Antipolo City</span>
                 </div>
-                <div class="d-flex justify-content-center flex-wrap gap-3">
+                <div class="d-flex justify-content-center align-items-center gap-3">
                     <a href="https://www.facebook.com/beancrateofficial"
                        target="_blank"
                        rel="noopener noreferrer"
-                       class="text-decoration-none">
-                        Facebook
+                       class="qrder-social-icon-link text-decoration-none"
+                       aria-label="Bean Crate Cafe on Facebook"
+                       title="Facebook">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                            <path d="M13.5 22v-8.2h2.8l.4-3.2h-3.2V8.6c0-.9.3-1.6 1.6-1.6h1.7V4.1c-.3 0-1.3-.1-2.5-.1-2.5 0-4.1 1.5-4.1 4.2v2.4H7.5v3.2h2.7V22h3.3z" />
+                        </svg>
                     </a>
                     <a href="https://www.instagram.com/beancrateph/"
                        target="_blank"
                        rel="noopener noreferrer"
-                       class="text-decoration-none">
-                        Instagram
+                       class="qrder-social-icon-link text-decoration-none"
+                       aria-label="Bean Crate Cafe on Instagram"
+                       title="Instagram">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="2.5" y="2.5" width="19" height="19" rx="5" />
+                            <circle cx="12" cy="12" r="4.2" />
+                            <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+                        </svg>
                     </a>
                     <a href="https://www.tiktok.com/@@bean.crate"
                        target="_blank"
                        rel="noopener noreferrer"
-                       class="text-decoration-none">
-                        TikTok
+                       class="qrder-social-icon-link text-decoration-none"
+                       aria-label="Bean Crate Cafe on TikTok"
+                       title="TikTok">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                            <path d="M16.6 5.8A4.3 4.3 0 0 1 15.5 3h-3.1v12.4a2.6 2.6 0 0 1-2.6 2.5 2.6 2.6 0 0 1-2.6-2.6 2.6 2.6 0 0 1 2.6-2.6c.3 0 .5 0 .8.1V9.6a5.8 5.8 0 0 0-.8-.1A5.7 5.7 0 0 0 4 15.3 5.7 5.7 0 0 0 9.8 21a5.7 5.7 0 0 0 5.7-5.7V9.1a7.4 7.4 0 0 0 4.3 1.4V7.4a4.3 4.3 0 0 1-3.2-1.6z" />
+                        </svg>
                     </a>
                 </div>
             </footer>

@@ -34,11 +34,11 @@ public static class MenuSeeder
     // Exact product order across all 11 menu pages so split/added items stay in menu position
     public static readonly IReadOnlyList<string> OrderedProductNames = new[]
     {
-        // Coffee
-        "Americano", "Latte", "Cappuccino", "Spanish Latte", "Caramel Macchiato",
-        "Mocha Latte", "Brown Sugar Latte", "Dirty Matcha", "Honey Crumble Latte",
-        "Peppermint Mocha", "White Peppermint Mocha", "Nutella Latte", "Biscoff Latte",
-        "Tiramisu Latte", "Spanish Dalgona Latte", "Bean Crate Latte",
+        // Coffee (House signature Bean Crate Latte listed first)
+        "Bean Crate Latte", "Americano", "Latte", "Cappuccino", "Spanish Latte",
+        "Caramel Macchiato", "Mocha Latte", "Brown Sugar Latte", "Dirty Matcha",
+        "Honey Crumble Latte", "Peppermint Mocha", "White Peppermint Mocha",
+        "Nutella Latte", "Biscoff Latte", "Tiramisu Latte", "Spanish Dalgona Latte",
         // Non-Coffee
         "Choco", "Toasted Marshmallow Hot Choco", "Matcha Latte", "Ube Milk",
         "Strawberry Milk", "Mango Milk", "Milo Thicc Dinosaur", "Strawberry Choco",
@@ -131,6 +131,51 @@ public static class MenuSeeder
 
         return string.Join("-", new string(chars)
             .Split('-', StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private static readonly string[] SupportedImageExtensions = { ".png", ".jpg", ".jpeg", ".webp" };
+
+    public static string ResolveProductImageUrl(string? imageUrl, string productName, string? webRootPath = null)
+    {
+        if (!string.IsNullOrWhiteSpace(imageUrl)
+            && !imageUrl.StartsWith("/images/products/", StringComparison.OrdinalIgnoreCase))
+        {
+            return imageUrl;
+        }
+
+        var slug = ToProductSlug(productName);
+
+        if (!string.IsNullOrWhiteSpace(webRootPath))
+        {
+            var productsDir = Path.Combine(webRootPath, "images", "products");
+            if (Directory.Exists(productsDir))
+            {
+                // 1. Fast exact-case lookup across supported extensions (.png, .jpg, .jpeg, .webp)
+                foreach (var ext in SupportedImageExtensions)
+                {
+                    var candidateName = slug + ext;
+                    if (File.Exists(Path.Combine(productsDir, candidateName)))
+                    {
+                        return "/images/products/" + candidateName;
+                    }
+                }
+
+                // 2. Case-insensitive fallback for Linux/Docker deployments (e.g., Bean-Crate-Latte.PNG)
+                var matchedFile = Directory.EnumerateFiles(productsDir)
+                    .Select(Path.GetFileName)
+                    .FirstOrDefault(fileName =>
+                        !string.IsNullOrEmpty(fileName)
+                        && string.Equals(Path.GetFileNameWithoutExtension(fileName), slug, StringComparison.OrdinalIgnoreCase)
+                        && SupportedImageExtensions.Contains(Path.GetExtension(fileName), StringComparer.OrdinalIgnoreCase));
+
+                if (!string.IsNullOrEmpty(matchedFile))
+                {
+                    return "/images/products/" + matchedFile;
+                }
+            }
+        }
+
+        return $"/images/products/{slug}.png";
     }
 
     public static async Task SeedAsync(ApplicationDbContext context)
@@ -344,6 +389,7 @@ public static class MenuSeeder
         var items = new List<Product>
         {
             // ================= PAGE 1: COFFEE =================
+            MakeItem("Coffee", "Bean Crate Latte", 160m, "House signature specialty iced latte.", IcedOnlyDrink()),
             MakeItem("Coffee", "Americano", 80m, "Classic espresso with water.", HotIcedDrink(80m, 100m)),
             MakeItem("Coffee", "Latte", 90m, "Smooth espresso with steamed or cold milk.", HotIcedDrink(90m, 110m)),
             MakeItem("Coffee", "Cappuccino", 90m, "Rich espresso topped with velvety milk foam.", HotIcedDrink(90m, 110m)),
@@ -359,7 +405,6 @@ public static class MenuSeeder
             MakeItem("Coffee", "Biscoff Latte", 160m, "Spiced caramelized biscuit spread espresso latte.", IcedOnlyDrink()),
             MakeItem("Coffee", "Tiramisu Latte", 160m, "Mascarpone-inspired cocoa espresso latte.", IcedOnlyDrink()),
             MakeItem("Coffee", "Spanish Dalgona Latte", 160m, "Whipped coffee foam over sweet Spanish milk.", IcedOnlyDrink()),
-            MakeItem("Coffee", "Bean Crate Latte", 160m, "House signature specialty iced latte.", IcedOnlyDrink()),
 
             // ================= PAGE 1: NON-COFFEE =================
             MakeItem("Non-Coffee", "Choco", 90m, "Rich classic chocolate drink.", HotColdDrink(90m, 120m)),

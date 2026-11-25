@@ -1,16 +1,28 @@
 @*
     Views/Orders/Index.cshtml
-    PC Order Board for QRDER (Bean Crate Cafe):
-    - Displays live order counts, status/payment filter tabs, instant search,
-      and a detailed desktop table with Asia/Manila timestamps and payment badges.
-    - Retains stack-table mobile fallback attributes for narrow viewports.
+    PC & Tablet Landscape Order Board for QRDER (Bean Crate Cafe):
+    - Features the Neo-Industrial Kitchen Telemetry live beacon bar and 4-column
+      Split-Flap Departure-Board KPI tiles optimized for Mobile, Tablet Landscape, and PC.
+    - Displays status/payment filter tabs, instant search, tabular-aligned timestamps
+      and totals (Asia/Manila), and live background queue synchronization.
 *@
 @model IEnumerable<orderManagementSystem.Models.Order>
 
 @{
     ViewData["Title"] = "Order Board";
     var ordersList = Model.ToList();
-    var manilaTz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+
+    TimeZoneInfo ResolveManilaTimeZone()
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila"); }
+        catch
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time"); }
+            catch { return TimeZoneInfo.CreateCustomTimeZone("PHT", TimeSpan.FromHours(8), "Philippine Standard Time", "PHT"); }
+        }
+    }
+
+    var manilaTz = ResolveManilaTimeZone();
 
     var totalCount = ordersList.Count;
     var activeCount = ordersList.Count(o => o.Status == "Pending" || o.Status == "Preparing");
@@ -19,21 +31,31 @@
 
     string StatusBadgeStyle(string status) => status switch
     {
-        "Pending" => "background-color: #fff3cd; color: #664d03; border: 1px solid #ffecb5;",
-        "Preparing" => "background-color: #cfe2ff; color: #084298; border: 1px solid #b6d4fe;",
-        "Completed" => "background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;",
-        "Cancelled" => "background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7;",
-        _ => "background-color: var(--qrder-cream-soft); color: var(--qrder-ink);"
+        "Pending" => "background-color: #fff3cd; color: #664d03; border: 1.5px solid #664d03;",
+        "Preparing" => "background-color: #cfe2ff; color: #084298; border: 1.5px solid #084298;",
+        "Completed" => "background-color: #d1e7dd; color: #0f5132; border: 1.5px solid #0f5132;",
+        "Cancelled" => "background-color: #f8d7da; color: #842029; border: 1.5px solid #842029;",
+        _ => "background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1.5px solid var(--qrder-border-strong);"
     };
 
     string PaymentBadgeStyle(string paymentStatus) => paymentStatus switch
     {
-        "Paid" => "background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;",
-        "Pending" => "background-color: #fff3cd; color: #664d03; border: 1px solid #ffecb5;",
-        "Failed" or "Expired" => "background-color: #f8d7da; color: #842029; border: 1px solid #f5c2c7;",
-        _ => "background-color: var(--qrder-cream-soft); color: var(--qrder-muted); border: 1px solid var(--qrder-border);"
+        "Paid" => "background-color: #d1e7dd; color: #0f5132; border: 1.5px solid #0f5132;",
+        "Pending" => "background-color: #fff3cd; color: #664d03; border: 1.5px solid #664d03;",
+        "Failed" or "Expired" => "background-color: #f8d7da; color: #842029; border: 1.5px solid #842029;",
+        _ => "background-color: var(--qrder-cream-soft); color: var(--qrder-muted); border: 1.5px solid var(--qrder-border-strong);"
     };
 }
+
+<div class="qrder-telemetry-strip mb-3">
+    <div class="d-flex align-items-center gap-2">
+        <span class="qrder-beacon" aria-hidden="true"></span>
+        <span>KITCHEN TELEMETRY &middot; LIVE QUEUE FEED</span>
+    </div>
+    <div class="qrder-tabular">
+        ACTIVE: @activeCount &middot; UNPAID: @unpaidCount &middot; PHT (UTC+8)
+    </div>
+</div>
 
 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
@@ -44,8 +66,10 @@
         </p>
     </div>
 
-    <div>
-        <a asp-action="CreateForCustomer" class="btn menu-btn px-4 py-2 fw-semibold">
+    <div class="flex-shrink-0 d-flex align-items-center gap-2">
+        <a asp-action="CreateForCustomer"
+           data-qrder-loading="Opening counter order builder..."
+           class="btn menu-btn px-4 py-2 fw-bold text-nowrap">
             + New Order
         </a>
     </div>
@@ -58,54 +82,56 @@
         <p class="text-muted small mb-3">
             Orders placed by customers on mobile or entered at the counter will appear here.
         </p>
-        <a asp-action="CreateForCustomer" class="btn menu-btn px-4">
+        <a asp-action="CreateForCustomer"
+           data-qrder-loading="Opening counter order builder..."
+           class="btn menu-btn px-4">
             Create First Order
         </a>
     </div>
 }
 else
 {
-    @* Quick Operational Counters *@
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-xl-3">
-            <div class="qrder-callout">
-                <div class="small text-muted">Total Orders</div>
-                <div class="fs-4 fw-bold mt-1">@totalCount</div>
+    @* Split-Flap Departure-Board Operational Counters (4-Across on Tablet Landscape & PC) *@
+    <div class="row g-3 mb-4" id="orderKpiRow">
+        <div class="col-6 col-md-3">
+            <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+                <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Total Orders</div>
+                <div class="fs-3 fw-bold qrder-tabular mt-1" id="kpiTotalCount">@totalCount</div>
             </div>
         </div>
-        <div class="col-6 col-xl-3">
-            <div class="qrder-callout">
-                <div class="small text-muted">Active (Pending / Preparing)</div>
-                <div class="fs-4 fw-bold mt-1">@activeCount</div>
+        <div class="col-6 col-md-3">
+            <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+                <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Active Queue</div>
+                <div class="fs-3 fw-bold qrder-tabular mt-1" id="kpiActiveCount">@activeCount</div>
             </div>
         </div>
-        <div class="col-6 col-xl-3">
-            <div class="qrder-callout">
-                <div class="small text-muted">Awaiting Payment</div>
-                <div class="fs-4 fw-bold mt-1">@unpaidCount</div>
+        <div class="col-6 col-md-3">
+            <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+                <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Awaiting Pay</div>
+                <div class="fs-3 fw-bold qrder-tabular mt-1" id="kpiUnpaidCount">@unpaidCount</div>
             </div>
         </div>
-        <div class="col-6 col-xl-3">
-            <div class="qrder-callout">
-                <div class="small text-muted">Completed</div>
-                <div class="fs-4 fw-bold mt-1">@completedCount</div>
+        <div class="col-6 col-md-3">
+            <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+                <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.06em;">Completed</div>
+                <div class="fs-3 fw-bold qrder-tabular mt-1" id="kpiCompletedCount">@completedCount</div>
             </div>
         </div>
     </div>
 
     @* Filter Pills & Instant Search *@
     <div class="qrder-card mb-4">
-        <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-3">
-            <div class="d-flex flex-wrap gap-2" id="orderFilterTabs" role="group" aria-label="Filter orders">
-                <button type="button" class="btn btn-sm menu-btn px-3" data-filter="all">All (@totalCount)</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-filter="Pending">Pending</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-filter="Preparing">Preparing</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-filter="unpaid">Unpaid (@unpaidCount)</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-filter="Completed">Completed</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary px-3" data-filter="Cancelled">Cancelled</button>
+        <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-2 mb-3">
+            <div class="d-flex flex-wrap align-items-center gap-2" id="orderFilterTabs" role="group" aria-label="Filter orders">
+                <button type="button" class="btn btn-sm menu-btn px-2 px-xxl-3 text-nowrap" data-filter="all">All (@totalCount)</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary px-2 px-xxl-3 text-nowrap" data-filter="Pending">Pending</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary px-2 px-xxl-3 text-nowrap" data-filter="Preparing">Preparing</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary px-2 px-xxl-3 text-nowrap" data-filter="unpaid">Unpaid (@unpaidCount)</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary px-2 px-xxl-3 text-nowrap" data-filter="Completed">Completed</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary px-2 px-xxl-3 text-nowrap" data-filter="Cancelled">Cancelled</button>
             </div>
 
-            <div style="min-width: 240px;">
+            <div class="flex-shrink-0" style="min-width: 220px;">
                 <input type="search"
                        id="orderSearchInput"
                        class="form-control form-control-sm"
@@ -118,16 +144,16 @@ else
             <table class="table table-hover align-middle stack-table mb-0" id="orderBoardTable">
                 <thead>
                     <tr>
-                        <th>Order #</th>
-                        <th>Customer</th>
-                        <th>Placed (PHT)</th>
-                        <th>Payment</th>
-                        <th>Order Status</th>
-                        <th class="text-end">Total</th>
-                        <th class="text-end">Actions</th>
+                        <th class="text-nowrap">Order #</th>
+                        <th class="text-nowrap">Customer</th>
+                        <th class="text-nowrap">Placed (PHT)</th>
+                        <th class="text-nowrap">Payment</th>
+                        <th class="text-nowrap">Order Status</th>
+                        <th class="text-end text-nowrap pe-4">Total</th>
+                        <th class="text-end text-nowrap">Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="orderBoardTableBody">
                     @foreach (var order in ordersList)
                     {
                         var localDate = TimeZoneInfo.ConvertTimeFromUtc(
@@ -139,41 +165,42 @@ else
                         <tr data-status="@order.Status"
                             data-unpaid="@(isUnpaid ? "true" : "false")"
                             data-search="@($"{order.Id} {order.CustomerName} {order.PaymentMethod}".ToLowerInvariant())">
-                            <td data-label="Order #" class="fw-bold">
+                            <td data-label="Order #" class="fw-bold qrder-tabular text-nowrap">
                                 #@order.Id
                             </td>
                             <td data-label="Customer">
-                                <div class="fw-semibold">@order.CustomerName</div>
+                                <div class="fw-bold">@order.CustomerName</div>
                                 @if (order.Items != null && order.Items.Any())
                                 {
-                                    <div class="small text-muted">
+                                    <div class="small text-muted qrder-tabular">
                                         @order.Items.Sum(i => i.Quantity) item(s)
                                     </div>
                                 }
                             </td>
-                            <td data-label="Placed (PHT)">
-                                <div>@localDate.ToString("MMM dd, yyyy")</div>
+                            <td data-label="Placed (PHT)" class="qrder-tabular text-nowrap">
+                                <div class="fw-semibold">@localDate.ToString("MMM dd, yyyy")</div>
                                 <div class="small text-muted">@localDate.ToString("hh:mm tt")</div>
                             </td>
-                            <td data-label="Payment">
-                                <span class="small fw-semibold me-1">@order.PaymentMethod</span>
-                                <span class="badge rounded-pill" style="@PaymentBadgeStyle(order.PaymentStatus)">
+                            <td data-label="Payment" class="text-nowrap">
+                                <span class="small fw-bold me-1">@order.PaymentMethod</span>
+                                <span class="badge" style="@PaymentBadgeStyle(order.PaymentStatus)">
                                     @order.PaymentStatus
                                 </span>
                             </td>
-                            <td data-label="Order Status">
-                                <span class="badge rounded-pill" style="@StatusBadgeStyle(order.Status)">
+                            <td data-label="Order Status" class="text-nowrap">
+                                <span class="badge" style="@StatusBadgeStyle(order.Status)">
                                     @order.Status
                                 </span>
                             </td>
-                            <td data-label="Total" class="text-end fw-bold">
+                            <td data-label="Total" class="text-end fw-bold qrder-tabular text-nowrap pe-4" style="color: var(--qrder-roast);">
                                 ₱@order.TotalAmount.ToString("N2")
                             </td>
-                            <td data-label="Actions" class="text-end">
+                            <td data-label="Actions" class="text-end text-nowrap">
                                 <a asp-action="Details"
                                    asp-route-id="@order.Id"
-                                   class="btn btn-sm btn-outline-secondary px-3">
-                                    Open &amp; Receipt
+                                   data-qrder-loading="Opening order slip..."
+                                   class="btn btn-sm btn-outline-secondary px-3 text-nowrap">
+                                    Open &amp; Order Slip
                                 </a>
                             </td>
                         </tr>
@@ -193,10 +220,10 @@ else
         (() => {
             const tabs = document.querySelectorAll("#orderFilterTabs [data-filter]");
             const searchInput = document.getElementById("orderSearchInput");
-            const rows = document.querySelectorAll("#orderBoardTable tbody tr");
+            const tableBody = document.getElementById("orderBoardTableBody");
             const emptyMsg = document.getElementById("orderEmptyFilterMessage");
 
-            if (!tabs.length || !rows.length) {
+            if (!tabs.length || !tableBody) {
                 return;
             }
 
@@ -204,6 +231,7 @@ else
 
             function applyFilters() {
                 const query = (searchInput?.value || "").trim().toLowerCase();
+                const rows = tableBody.querySelectorAll("tr");
                 let visibleCount = 0;
 
                 rows.forEach((row) => {
@@ -247,6 +275,51 @@ else
             });
 
             searchInput?.addEventListener("input", applyFilters);
+
+            // Background live board sync preserving active tab & search term
+            async function syncOrderBoard() {
+                if (document.hidden || document.activeElement === searchInput) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(window.location.href, {
+                        headers: { "X-Requested-With": "XMLHttpRequest" },
+                        cache: "no-store"
+                    });
+                    if (!response.ok) return;
+
+                    const html = await response.text();
+                    const doc = new DOMParser().parseFromString(html, "text/html");
+                    const nextBody = doc.getElementById("orderBoardTableBody");
+                    if (!nextBody) return;
+
+                    ["kpiTotalCount", "kpiActiveCount", "kpiUnpaidCount", "kpiCompletedCount"].forEach((id) => {
+                        const cur = document.getElementById(id);
+                        const nxt = doc.getElementById(id);
+                        if (cur && nxt && cur.textContent !== nxt.textContent) {
+                            cur.textContent = nxt.textContent;
+                        }
+                    });
+
+                    ["all", "unpaid"].forEach((filterKey) => {
+                        const curTab = document.querySelector(`#orderFilterTabs [data-filter="${filterKey}"]`);
+                        const nxtTab = doc.querySelector(`#orderFilterTabs [data-filter="${filterKey}"]`);
+                        if (curTab && nxtTab && curTab.textContent !== nxtTab.textContent) {
+                            curTab.textContent = nxtTab.textContent;
+                        }
+                    });
+
+                    if (tableBody.innerHTML !== nextBody.innerHTML) {
+                        tableBody.innerHTML = nextBody.innerHTML;
+                        applyFilters();
+                    }
+                } catch {
+                    // Ignore transient network errors and retry on next interval
+                }
+            }
+
+            setInterval(syncOrderBoard, 10000);
         })();
     </script>
 }

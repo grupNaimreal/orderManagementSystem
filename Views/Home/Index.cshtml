@@ -9,6 +9,38 @@
     string todaySales = ViewBag.TodaySalesFormatted as string ?? "—";
 }
 
+<style>
+    /* Roastery Press Dining Preference Segmented Toggle */
+    .qrder-pref-group {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+
+    .qrder-pref-group .qrder-pref-btn {
+        border: 2px solid var(--qrder-border-strong, #2b1d16) !important;
+        border-radius: var(--qrder-radius, 4px) !important;
+        background-color: var(--qrder-surface, #fffdf9);
+        color: var(--qrder-ink, #221610);
+        font-weight: 700;
+        padding: 0.55rem 0.75rem;
+        box-shadow: 2px 2px 0px var(--qrder-shadow-color, #2b1d16);
+        transition: background-color 0.14s ease, color 0.14s ease, transform 0.1s ease;
+    }
+
+    .qrder-pref-group .qrder-pref-btn.btn-sm {
+        padding: 0.4rem 0.65rem;
+        font-size: 0.85rem;
+    }
+
+    .qrder-pref-group .btn-check:checked + .qrder-pref-btn {
+        background-color: var(--qrder-espresso, #2b1d16) !important;
+        color: #fffaf3 !important;
+        border-color: var(--qrder-border-strong, #2b1d16) !important;
+        box-shadow: 3px 3px 0px var(--qrder-amber, #C05800);
+    }
+</style>
+
 @if (isStaff)
 {
     <div class="mb-4">
@@ -20,12 +52,12 @@
     </div>
 
     <div class="row g-4 mb-4">
-        <div class="col-lg-7">
+        <div class="col-md-6 col-lg-7">
             <div class="qrder-card h-100 d-flex flex-column justify-content-between">
                 <div>
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <h2 class="h5 fw-bold mb-0">Counter Operations</h2>
-                        <span class="badge rounded-pill" style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1px solid var(--qrder-border);">
+                        <span class="badge" style="background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1.5px solid var(--qrder-border-strong);">
                             @(isOwner ? "Owner Access" : "Staff Access")
                         </span>
                     </div>
@@ -34,65 +66,69 @@
                     </p>
                 </div>
 
-                <div class="d-flex flex-wrap gap-2">
-                    <a asp-controller="Orders"
-                       asp-action="CreateForCustomer"
-                       class="btn menu-btn px-4 py-2 fw-semibold">
-                        + New Order
-                    </a>
-                    <a asp-controller="Orders"
-                       asp-action="Index"
-                       class="btn btn-outline-secondary px-3 py-2">
-                        Order Board
-                    </a>
-                    <a asp-controller="Products"
-                       asp-action="Index"
-                       class="btn btn-outline-secondary px-3 py-2">
-                        Menu Studio
-                    </a>
-                    <a asp-controller="Customers"
-                       asp-action="Index"
-                       class="btn btn-outline-secondary px-3 py-2">
-                        Customer Sessions
-                    </a>
-                    @if (isOwner)
-                    {
-                        <a asp-controller="Employees"
-                           asp-action="Index"
-                           class="btn btn-outline-secondary px-3 py-2">
-                            Staff Accounts
+                <div>
+                    <div class="d-grid d-sm-flex mb-2">
+                        <a asp-controller="Orders"
+                           asp-action="CreateForCustomer"
+                           class="btn menu-btn px-4 py-2 fw-bold">
+                            + New Order
                         </a>
-                    }
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a asp-controller="Orders"
+                           asp-action="Index"
+                           class="btn btn-outline-secondary btn-sm px-3 py-2">
+                            Order Board
+                        </a>
+                        <a asp-controller="Products"
+                           asp-action="Index"
+                           class="btn btn-outline-secondary btn-sm px-3 py-2">
+                            Menu Studio
+                        </a>
+                        <a asp-controller="Customers"
+                           asp-action="Index"
+                           class="btn btn-outline-secondary btn-sm px-3 py-2">
+                            Customer Sessions
+                        </a>
+                        @if (isOwner)
+                        {
+                            <a asp-controller="Employees"
+                               asp-action="Index"
+                               class="btn btn-outline-secondary btn-sm px-3 py-2">
+                                Staff Accounts
+                            </a>
+                        }
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-lg-5">
-            <div class="qrder-card h-100">
+        <div class="col-md-6 col-lg-5">
+            <div class="qrder-card h-100 d-flex flex-column">
                 <h2 class="h5 fw-bold mb-3">Today&rsquo;s Snapshot</h2>
-                <div class="row g-3">
+                <div class="row g-3 flex-grow-1">
                     <div class="col-6">
-                        <div class="qrder-callout">
-                            <div class="small text-muted">Orders Today</div>
-                            <div class="fs-4 fw-bold mt-1">@todayOrders</div>
+                        <div class="qrder-callout h-100 d-flex flex-column justify-content-between">
+                            <div class="small text-muted fw-bold">Orders Today</div>
+                            <div class="fs-4 fw-bold mt-2">@todayOrders</div>
                         </div>
                     </div>
                     <div class="col-6">
-                        <div class="qrder-callout">
-                            <div class="small text-muted">Active Queue</div>
-                            <div class="fs-4 fw-bold mt-1">@activeOrders</div>
+                        <div class="qrder-callout h-100 d-flex flex-column justify-content-between">
+                            <div class="small text-muted fw-bold">Active Queue</div>
+                            <div class="fs-4 fw-bold mt-2">@activeOrders</div>
                         </div>
                     </div>
                     <div class="col-6">
-                        <div class="qrder-callout">
-                            <div class="small text-muted">Unpaid / Pending</div>
-                            <div class="fs-4 fw-bold mt-1">@pendingPayments</div>
+                        <div class="qrder-callout h-100 d-flex flex-column justify-content-between">
+                            <div class="small text-muted fw-bold">Unpaid / Pending</div>
+                            <div class="fs-4 fw-bold mt-2">@pendingPayments</div>
                         </div>
                     </div>
                     <div class="col-6">
-                        <div class="qrder-callout">
-                            <div class="small text-muted">Completed Sales</div>
-                            <div class="fs-4 fw-bold mt-1">@todaySales</div>
+                        <div class="qrder-callout h-100 d-flex flex-column justify-content-between">
+                            <div class="small text-muted fw-bold">Completed Sales</div>
+                            <div class="fs-4 fw-bold mt-2" style="color: var(--qrder-roast);">@todaySales</div>
                         </div>
                     </div>
                 </div>
@@ -104,7 +140,7 @@
         <div class="fw-bold mb-1">
             Made for the <span class="qrder-wordmark-inline">QRDER</span> counter.
         </div>
-        <div class="small text-muted">
+        <div class="small text-muted fst-italic">
             A focused workspace for taking orders, confirming payment details, and keeping kitchen handoffs clear.
         </div>
     </div>
@@ -116,21 +152,25 @@ else
     var enteredName = (TempData["EnteredName"] as string) ?? string.Empty;
     int myOrdersCount = ViewBag.MyOrdersCount is int count ? count : 0;
 
-    <div class="mx-auto" style="max-width: 520px;">
+    <div class="mx-auto" style="max-width: 580px;">
         <div class="qrder-card py-4 px-3 px-sm-4">
-            <div class="text-center mb-4">
-                <img src="~/images/qrder-logo.svg"
-                     alt="QRDER Logo"
-                     style="width: 64px; height: 64px; object-fit: contain;"
-                     class="mb-2" />
-                <div class="qrder-eyebrow">BEAN CRATE CAFE &middot; ORDERING</div>
+            <div class="text-center mb-3">
+                <div class="d-inline-flex align-items-center justify-content-center p-2 mb-2"
+                     style="background-color: var(--qrder-cream-soft); border: 2px solid var(--qrder-border-strong); border-radius: var(--qrder-radius, 4px); box-shadow: 3px 3px 0px var(--qrder-shadow-color);">
+                    <img src="~/images/qrder-logo.svg"
+                         alt="QRDER Logo"
+                         style="width: 58px; height: 58px; object-fit: contain;" />
+                </div>
+                <div class="d-block qrder-eyebrow">BEAN CRATE CAFE &middot; ORDERING TICKET</div>
                 <h1 class="h3 fw-bold mb-1">
                     <span class="qrder-wordmark-inline">QRDER</span>
                 </h1>
-                <p class="text-muted small mb-0">
+                <p class="text-muted small fst-italic mb-0">
                     Start your table session below to unlock the digital menu and send your order to the counter.
                 </p>
             </div>
+
+            <hr class="qrder-ticket-divider" />
 
             @if (TempData["SessionNotice"] is string sessionNotice)
             {
@@ -157,14 +197,14 @@ else
 
                 <div class="qrder-callout mb-3">
                     <div class="d-flex align-items-center justify-content-between gap-2">
-                        <div class="small text-muted">Active Session</div>
-                        <span class="badge rounded-pill"
-                              style="background-color: var(--qrder-espresso); color: #f6efe6;">
+                        <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.08em;">Active Session</div>
+                        <span class="badge"
+                              style="background-color: var(--qrder-espresso); color: #f6efe6; border: 1.5px solid var(--qrder-border-strong);">
                             @(isTakeOut ? "Take-Out" : "Dine-In")
                         </span>
                     </div>
                     <div class="fs-5 fw-bold mt-1">@currentCustomer.DisplayName</div>
-                    <div class="small text-muted mt-1">
+                    <div class="small text-muted fst-italic mt-1">
                         Your session stays active for 10 minutes between actions.
                     </div>
                 </div>
@@ -172,7 +212,7 @@ else
                 <div class="d-grid gap-2 mb-3">
                     <a asp-controller="Products"
                        asp-action="Index"
-                       class="btn menu-btn py-2 fw-semibold">
+                       class="btn menu-btn py-2 fw-bold">
                         Browse Menu &amp; Order
                     </a>
                     <a asp-controller="Orders"
@@ -182,8 +222,8 @@ else
                     </a>
                 </div>
 
-                <details class="border rounded-3 p-3 mb-2" style="border-color: var(--qrder-border) !important; background-color: var(--qrder-surface);">
-                    <summary class="small fw-semibold" style="cursor: pointer;">
+                <details class="p-3 mb-2" style="border: 2px solid var(--qrder-border-strong); border-radius: var(--qrder-radius, 4px); background-color: var(--qrder-cream-soft);">
+                    <summary class="small fw-bold" style="cursor: pointer;">
                         Edit Name or Dine-In / Take-Out Preference
                     </summary>
 
@@ -192,29 +232,32 @@ else
                           method="post"
                           class="pt-3">
                         <div class="mb-2">
-                            <label class="form-label small fw-semibold d-block mb-1">Dining Preference</label>
-                            <div class="btn-group w-100" role="group" aria-label="Dining preference">
-                                <input type="radio"
-                                       class="btn-check"
-                                       name="diningType"
-                                       id="prefDineIn"
-                                       value="DineIn"
-                                       checked="@(!isTakeOut)" />
-                                <label class="btn btn-sm btn-outline-secondary" for="prefDineIn">Dine-In</label>
-
-                                <input type="radio"
-                                       class="btn-check"
-                                       name="diningType"
-                                       id="prefTakeOut"
-                                       value="TakeOut"
-                                       checked="@(isTakeOut)" />
-                                <label class="btn btn-sm btn-outline-secondary" for="prefTakeOut">Take-Out</label>
+                            <label class="form-label small fw-bold d-block mb-1">Dining Preference</label>
+                            <div class="qrder-pref-group" role="group" aria-label="Dining preference">
+                                <div>
+                                    <input type="radio"
+                                           class="btn-check"
+                                           name="diningType"
+                                           id="prefDineIn"
+                                           value="DineIn"
+                                           checked="@(!isTakeOut)" />
+                                    <label class="btn btn-sm qrder-pref-btn w-100" for="prefDineIn">Dine-In</label>
+                                </div>
+                                <div>
+                                    <input type="radio"
+                                           class="btn-check"
+                                           name="diningType"
+                                           id="prefTakeOut"
+                                           value="TakeOut"
+                                           checked="@(isTakeOut)" />
+                                    <label class="btn btn-sm qrder-pref-btn w-100" for="prefTakeOut">Take-Out</label>
+                                </div>
                             </div>
                         </div>
 
                         <div class="mb-2 @(isTakeOut ? "d-none" : "")" id="editTableNumberGroup">
-                            <label for="editTableNumber" class="form-label small fw-semibold mb-1">
-                                Table Number <span class="text-muted fw-normal">(Optional)</span>
+                            <label for="editTableNumber" class="form-label small fw-bold mb-1">
+                                Table Number <span class="text-muted fw-normal fst-italic">(Optional)</span>
                             </label>
                             <input type="text"
                                    id="editTableNumber"
@@ -226,7 +269,7 @@ else
                         </div>
 
                         <div class="mb-3">
-                            <label for="editDisplayName" class="form-label small fw-semibold mb-1">Your Name</label>
+                            <label for="editDisplayName" class="form-label small fw-bold mb-1">Your Name</label>
                             <input type="text"
                                    id="editDisplayName"
                                    name="displayName"
@@ -237,7 +280,7 @@ else
                                    class="form-control form-control-sm" />
                         </div>
 
-                        <button type="submit" class="btn btn-sm menu-btn w-100 fw-semibold">
+                        <button type="submit" class="btn btn-sm menu-btn w-100 fw-bold">
                             Save Session Changes
                         </button>
                     </form>
@@ -270,24 +313,60 @@ else
             }
             else
             {
-                <form asp-controller="Customers" asp-action="Create" method="post">
+                var startIsTakeOut = tableLabel.StartsWith("Take", StringComparison.OrdinalIgnoreCase);
+                var startTableNum = !startIsTakeOut && tableLabel.StartsWith("Table ", StringComparison.OrdinalIgnoreCase)
+                    ? tableLabel[6..].Trim()
+                    : (!startIsTakeOut && !string.Equals(tableLabel, "Dine-In", StringComparison.OrdinalIgnoreCase)
+                        ? tableLabel
+                        : string.Empty);
+
+                <form asp-controller="Customers" asp-action="Create" method="post" id="startSessionForm">
                     <input type="hidden" name="returnTo" value="home" />
+                    <input type="hidden" id="tableLabel" name="tableLabel" value="@tableLabel" />
 
                     <div class="mb-3">
-                        <label for="tableLabel" class="form-label small fw-semibold">
-                            Table / Counter <span class="text-muted fw-normal">(Optional)</span>
+                        <label class="form-label small fw-bold text-uppercase d-block mb-1" style="letter-spacing: 0.06em;">
+                            Dining Preference
+                        </label>
+                        <div class="qrder-pref-group" role="group" aria-label="Dining preference">
+                            <div>
+                                <input type="radio"
+                                       class="btn-check"
+                                       name="startDiningType"
+                                       id="startPrefDineIn"
+                                       value="DineIn"
+                                       checked="@(!startIsTakeOut)" />
+                                <label class="btn qrder-pref-btn w-100" for="startPrefDineIn">Dine-In</label>
+                            </div>
+                            <div>
+                                <input type="radio"
+                                       class="btn-check"
+                                       name="startDiningType"
+                                       id="startPrefTakeOut"
+                                       value="TakeOut"
+                                       checked="@(startIsTakeOut)" />
+                                <label class="btn qrder-pref-btn w-100" for="startPrefTakeOut">Take-Out</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 @(startIsTakeOut ? "d-none" : "")" id="startTableNumberGroup">
+                        <label for="startTableNumber" class="form-label small fw-bold text-uppercase" style="letter-spacing: 0.06em;">
+                            Table Number <span class="text-muted fw-normal fst-italic" style="text-transform: none;">(Optional)</span>
                         </label>
                         <input type="text"
-                               id="tableLabel"
-                               name="tableLabel"
-                               value="@tableLabel"
-                               maxlength="15"
+                               id="startTableNumber"
+                               value="@startTableNum"
+                               maxlength="12"
                                class="form-control"
-                               placeholder="e.g., Table 1 or Takeout" />
+                               placeholder="e.g., 1 or Table 1" />
+                        <div class="form-text small fst-italic">
+                            Leave blank if you haven&rsquo;t chosen a table yet.
+                        </div>
                     </div>
 
                     <div class="mb-3">
-                        <label for="DisplayName" class="form-label small fw-semibold">
+                        <label for="DisplayName" class="form-label small fw-bold text-uppercase" style="letter-spacing: 0.06em;">
                             Your Name
                         </label>
                         <input type="text"
@@ -299,17 +378,54 @@ else
                                required
                                class="form-control"
                                placeholder="Enter your name (e.g., Juan)" />
-                        <div class="form-text small">
+                        <div class="form-text small fst-italic">
                             2&ndash;30 characters. Used so our baristas can call your order.
                         </div>
                     </div>
 
                     <div class="d-grid">
-                        <button type="submit" class="btn menu-btn py-2 fw-semibold">
+                        <button type="submit" class="btn menu-btn py-2 fw-bold">
                             Start Session &amp; Open Menu
                         </button>
                     </div>
                 </form>
+
+                <script>
+                    (() => {
+                        const form = document.getElementById("startSessionForm");
+                        const dineInRadio = document.getElementById("startPrefDineIn");
+                        const takeOutRadio = document.getElementById("startPrefTakeOut");
+                        const tableGroup = document.getElementById("startTableNumberGroup");
+                        const tableInput = document.getElementById("startTableNumber");
+                        const hiddenLabel = document.getElementById("tableLabel");
+
+                        function syncStartSessionPreference() {
+                            const isTakeOut = Boolean(takeOutRadio?.checked);
+                            tableGroup?.classList.toggle("d-none", isTakeOut);
+
+                            if (!hiddenLabel) return;
+                            if (isTakeOut) {
+                                hiddenLabel.value = "Take-Out";
+                                return;
+                            }
+
+                            const rawTable = (tableInput?.value || "").trim();
+                            if (!rawTable) {
+                                hiddenLabel.value = "Dine-In";
+                            } else if (/^(table|take)/i.test(rawTable)) {
+                                hiddenLabel.value = rawTable;
+                            } else {
+                                hiddenLabel.value = `Table ${rawTable}`;
+                            }
+                        }
+
+                        dineInRadio?.addEventListener("change", syncStartSessionPreference);
+                        takeOutRadio?.addEventListener("change", syncStartSessionPreference);
+                        tableInput?.addEventListener("input", syncStartSessionPreference);
+                        form?.addEventListener("submit", syncStartSessionPreference);
+                        syncStartSessionPreference();
+                    })();
+                </script>
             }
         </div>
     </div>

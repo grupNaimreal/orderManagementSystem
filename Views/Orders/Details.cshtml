@@ -1,7 +1,8 @@
 @*
     Views/Orders/Details.cshtml
-    Order Details & Printable Official Receipt / Sales Invoice for QRDER (Bean Crate Cafe):
-    - Supports Cash and Maya Checkout Sandbox payment flows.
+    Order Details & Printable Order Summary Slip for QRDER (Bean Crate Cafe):
+    - Supports Cash and Maya Checkout Sandbox payment flows with automatic live Maya API polling.
+    - Streamlines recovery options when a Maya session is cancelled/closed vs. actively open.
     - Guards "Start Preparing Order" until payment is confirmed so staff avoid error bounces.
     - Uses a cross-platform Asia/Manila timezone resolver safe on Windows, Linux, and containers.
 *@
@@ -33,15 +34,39 @@
             manilaTz)
         : null;
 
+    string OrderStatusBadgeStyle(string status) => status switch
+    {
+        "Pending" => "background-color: #fff3cd; color: #664d03; border: 1.5px solid #664d03;",
+        "Preparing" => "background-color: #cfe2ff; color: #084298; border: 1.5px solid #084298;",
+        "Completed" => "background-color: #d1e7dd; color: #0f5132; border: 1.5px solid #0f5132;",
+        "Cancelled" => "background-color: #f8d7da; color: #842029; border: 1.5px solid #842029;",
+        _ => "background-color: var(--qrder-cream-soft); color: var(--qrder-ink); border: 1.5px solid var(--qrder-border-strong);"
+    };
+
+    string PaymentStatusBadgeStyle(string paymentStatus) => paymentStatus switch
+    {
+        "Paid" => "background-color: #d1e7dd; color: #0f5132; border: 1.5px solid #0f5132;",
+        "Pending" => "background-color: #fff3cd; color: #664d03; border: 1.5px solid #664d03;",
+        "Failed" or "Expired" => "background-color: #f8d7da; color: #842029; border: 1.5px solid #842029;",
+        _ => "background-color: var(--qrder-cream-soft); color: var(--qrder-muted); border: 1.5px solid var(--qrder-border-strong);"
+    };
+
     var canStartPreparing = Model.PaymentStatus == "Paid" || Model.PaymentStatus == "NotTracked";
+    var isVerifyingMaya = string.Equals(TempData["PaymentVerifying"] as string, "true", StringComparison.OrdinalIgnoreCase);
+    var showMayaRecoveryBox = !isStaff
+        && Model.PaymentMethod == "Maya"
+        && Model.PaymentStatus == "Pending"
+        && Model.Status == "Pending";
+    var hasOpenMayaUrl = !string.IsNullOrWhiteSpace(Model.PayMongoCheckoutUrl);
 }
 
 <style>
     .qrder-receipt-slip {
         background-color: var(--qrder-surface);
-        border: 1px dashed var(--qrder-border);
-        border-radius: 16px;
+        border: 2px dashed var(--qrder-border-strong);
+        border-radius: var(--qrder-radius, 4px);
         padding: 1.35rem;
+        box-shadow: var(--qrder-shadow-md);
     }
 
     @@media print {
@@ -83,7 +108,7 @@
         @if (isStaff)
         {
             <button type="button" onclick="window.print()" class="btn btn-outline-secondary px-3">
-                Print Official Receipt
+                Print Order Slip
             </button>
             <a asp-action="Index" class="btn btn-outline-secondary px-3">
                 Back to Order Board
@@ -98,12 +123,23 @@
     </div>
 </div>
 
+@if (!isStaff && Model.Status == "Completed")
+{
+    <div class="alert alert-success d-flex align-items-center gap-2 no-print" role="status">
+        <span class="fs-5 lh-1">&#10003;</span>
+        <div>
+            <div class="fw-bold">Order Completed &mdash; Safe to Leave This Page</div>
+            <div class="small">Your order is ready/served. You may now safely close or leave this page.</div>
+        </div>
+    </div>
+}
+
 @if (TempData["PaymentError"] is string paymentError)
 {
     <div class="alert alert-warning no-print">@paymentError</div>
 }
 
-@if (TempData["PaymentNotice"] is string paymentNotice)
+@if (TempData["PaymentNotice"] is string paymentNotice && !(showMayaRecoveryBox && !hasOpenMayaUrl))
 {
     <div class="alert alert-info no-print">@paymentNotice</div>
 }
@@ -115,8 +151,11 @@
 
 <div class="row g-4"
      id="qrderOrderDetailsRoot"
+     data-order-id="@Model.Id"
      data-order-status="@Model.Status"
-     data-payment-status="@Model.PaymentStatus">
+     data-payment-method="@Model.PaymentMethod"
+     data-payment-status="@Model.PaymentStatus"
+     data-maya-check-url="@Url.Action("CheckMayaStatus", "Orders", new { id = Model.Id })">
     @* Left / Primary Column: Order Metadata & Line Items *@
     <div class="@(isStaff ? "col-lg-8" : "col-12") no-print">
         <div class="qrder-card mb-4">
@@ -133,13 +172,13 @@
 
             @if (!isStaff && (Model.Status == "Pending" || Model.Status == "Preparing"))
             {
-                <div class="d-flex align-items-center justify-content-between gap-2 px-3 py-2 mb-3 rounded-3 small"
-                     style="background-color: var(--qrder-cream-soft); border: 1px solid var(--qrder-border);">
-                    <span class="fw-semibold">
+                <div class="d-flex align-items-center justify-content-between gap-2 px-3 py-2 mb-3 small"
+                     style="background-color: var(--qrder-cream-soft); border: 1.5px solid var(--qrder-border-strong); border-radius: var(--qrder-radius, 4px);">
+                    <span class="fw-bold">
                         <span class="text-success me-1">&#9679;</span>
                         Live Order Tracking Active
                     </span>
-                    <span class="text-muted">Auto-updates automatically</span>
+                    <span class="text-muted fst-italic">Updates in real time</span>
                 </div>
             }
 
@@ -147,7 +186,11 @@
                 <div class="col-sm-4">
                     <div class="qrder-callout">
                         <div class="small text-muted">Order Status</div>
-                        <div class="fw-bold mt-1" id="liveOrderStatusText">@Model.Status</div>
+                        <div class="mt-1">
+                            <span class="badge" id="liveOrderStatusText" style="@OrderStatusBadgeStyle(Model.Status)">
+                                @Model.Status
+                            </span>
+                        </div>
                     </div>
                 </div>
                 <div class="col-sm-4">
@@ -159,44 +202,91 @@
                 <div class="col-sm-4">
                     <div class="qrder-callout">
                         <div class="small text-muted">Payment Status</div>
-                        <div class="fw-bold mt-1" id="livePaymentStatusText">@Model.PaymentStatus</div>
+                        <div class="mt-1">
+                            <span class="badge" id="livePaymentStatusText" style="@PaymentStatusBadgeStyle(Model.PaymentStatus)">
+                                @Model.PaymentStatus
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            @if (!isStaff
-                && Model.PaymentMethod == "Maya"
-                && Model.PaymentStatus == "Pending"
-                && Model.Status == "Pending")
+            @if (showMayaRecoveryBox)
             {
                 <div class="alert alert-info mt-4 mb-0">
-                    <div class="fw-bold mb-1">Complete Your Maya Checkout Payment</div>
-                    <p class="small mb-3">
-                        Click below to open Maya Sandbox Checkout and complete payment within 10 minutes of placing your order.
-                    </p>
+                    @if (isVerifyingMaya)
+                    {
+                        <div class="d-flex align-items-center gap-2 fw-bold mb-1">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            <span>Confirming Your Maya Payment...</span>
+                        </div>
+                        <p class="small mb-3">
+                            Maya is finalizing your payment. This page checks automatically every few seconds, or you can tap <strong>Verify Payment Now</strong> below.
+                        </p>
+                    }
+                    else if (hasOpenMayaUrl)
+                    {
+                        <div class="fw-bold mb-1">Complete Your Online Checkout (via Maya)</div>
+                        <p class="small mb-3">
+                            Complete your payment within 10 minutes of placing your order. If you already paid, tap <strong>Verify Payment Now</strong>.
+                        </p>
+                    }
+                    else
+                    {
+                        <div class="fw-bold mb-1">Online Checkout Was Cancelled</div>
+                        <p class="small mb-3">
+                            Your previous Maya session was closed before payment. Start a new Maya session below or switch to <strong>Cash at Counter</strong>.
+                        </p>
+                    }
 
                     <div class="d-flex flex-wrap gap-2 mb-3">
-                        @if (!string.IsNullOrWhiteSpace(Model.PayMongoCheckoutUrl))
+                        @if (hasOpenMayaUrl)
                         {
-                            <a href="@Model.PayMongoCheckoutUrl" class="btn menu-btn fw-semibold">
+                            <a href="@Model.PayMongoCheckoutUrl"
+                               onclick="window.showQrderLoading?.('Opening Maya Checkout...');"
+                               class="btn btn-sm menu-btn fw-bold">
                                 Open Maya Checkout &rarr;
                             </a>
+                            <form asp-action="StartMayaCheckout" asp-route-id="@Model.Id" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                    New Maya Session
+                                </button>
+                            </form>
+                            <a asp-action="MayaReturn"
+                               asp-route-id="@Model.Id"
+                               asp-route-outcome="success"
+                               onclick="window.showQrderLoading?.('Checking Maya payment status...');"
+                               class="btn btn-sm btn-outline-success fw-bold">
+                                &#10003; Verify Payment Now
+                            </a>
                         }
-                        <form asp-action="StartMayaCheckout" asp-route-id="@Model.Id" method="post" class="d-inline">
-                            <button type="submit" class="btn btn-outline-secondary">
-                                Generate New Maya Session
+                        else
+                        {
+                            <form asp-action="StartMayaCheckout" asp-route-id="@Model.Id" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm menu-btn fw-bold">
+                                    Start New Maya Checkout &rarr;
+                                </button>
+                            </form>
+                        }
+
+                        <form asp-action="SwitchToCash" asp-route-id="@Model.Id" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary fw-bold">
+                                Switch to Cash at Counter
                             </button>
                         </form>
                     </div>
 
                     <details class="small border-top pt-2">
-                        <summary class="fw-semibold" style="cursor: pointer;">
+                        <summary class="fw-bold" style="cursor: pointer;">
                             Maya Sandbox Test Credentials (For Demo / Grading)
                         </summary>
                         <div class="pt-2">
-                            <div><strong>Test Mastercard (No 3DS):</strong> <code>5123456789012346</code> &middot; Expiry <code>12/2030</code> &middot; CVV <code>111</code></div>
-                            <div><strong>Test Visa Card:</strong> <code>4123450131001381</code> &middot; Expiry <code>12/2030</code> &middot; CVV <code>123</code> &middot; 3DS Password <code>mctest1</code></div>
+                            <div><strong>Test Mastercard (Instant Approval):</strong> <code>5123456789012346</code> &middot; Expiry <code>12/2030</code> &middot; CVV <code>111</code></div>
+                            <div><strong>Test Visa Card (3DS):</strong> <code>4123450131001381</code> &middot; Expiry <code>12/2030</code> &middot; CVV <code>123</code> &middot; 3DS Password <code>mctest1</code></div>
                             <div><strong>Test Maya Wallet:</strong> <code>+639900100900</code> &middot; Password <code>Password@1</code> &middot; OTP <code>123456</code></div>
+                            <div class="text-muted mt-1">
+                                <strong>Note on QRPh in Sandbox:</strong> Maya&rsquo;s sandbox shows a QRPh preview without a simulated &ldquo;Pay&rdquo; button. Use <strong>Cards</strong> or <strong>Maya Wallet</strong> above for automatic confirmation, or ask counter staff to click <em>Confirm Maya / QRPh Manually</em>.
+                            </div>
                         </div>
                     </details>
                 </div>
@@ -227,7 +317,7 @@
                         {
                             <tr>
                                 <td>
-                                    <div class="fw-semibold">@item.ProductNameSnapshot</div>
+                                    <div class="fw-bold">@item.ProductNameSnapshot</div>
                                     @if (item.SelectedOptions != null && item.SelectedOptions.Any())
                                     {
                                         <div class="small text-muted">
@@ -236,16 +326,16 @@
                                         </div>
                                     }
                                 </td>
-                                <td class="text-center fw-semibold">@item.Quantity</td>
+                                <td class="text-center fw-bold">@item.Quantity</td>
                                 <td class="text-end">₱@item.UnitPrice.ToString("N2")</td>
-                                <td class="text-end fw-bold">₱@item.LineTotal.ToString("N2")</td>
+                                <td class="text-end fw-bold" style="color: var(--qrder-roast);">₱@item.LineTotal.ToString("N2")</td>
                             </tr>
                         }
                     </tbody>
                     <tfoot>
                         <tr>
                             <td colspan="3" class="text-end fw-bold">Total Amount</td>
-                            <td class="text-end fs-5 fw-bold">₱@Model.TotalAmount.ToString("N2")</td>
+                            <td class="text-end fs-5 fw-bold" style="color: var(--qrder-roast);">₱@Model.TotalAmount.ToString("N2")</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -253,7 +343,7 @@
         </div>
     </div>
 
-    @* Right Column: Staff Counter Actions & Official Thermal Receipt (Sales Invoice / OR) *@
+    @* Right Column: Staff Counter Actions & Order Summary Slip *@
     <div class="@(isStaff ? "col-lg-4" : "col-12")">
         @if (isStaff)
         {
@@ -264,7 +354,7 @@
                 @if (Model.PaymentMethod == "Cash" && Model.PaymentStatus == "Pending" && Model.Status != "Cancelled")
                 {
                     <form asp-action="MarkCashPaid" asp-route-id="@Model.Id" method="post" class="mb-2">
-                        <button type="submit" class="btn btn-success w-100 fw-semibold">
+                        <button type="submit" class="btn btn-success w-100 fw-bold">
                             &#10003; Confirm Cash Payment Received
                         </button>
                     </form>
@@ -274,7 +364,7 @@
                 {
                     <div class="d-grid gap-2 mb-2">
                         <form asp-action="VerifyMayaPayment" asp-route-id="@Model.Id" method="post">
-                            <button type="submit" class="btn menu-btn w-100 fw-semibold">
+                            <button type="submit" class="btn menu-btn w-100 fw-bold">
                                 Verify Status with Maya
                             </button>
                         </form>
@@ -291,7 +381,7 @@
                     <form asp-action="UpdateStatus" asp-route-id="@Model.Id" method="post" class="mb-2">
                         <input type="hidden" name="status" value="Preparing" />
                         <button type="submit"
-                                class="btn btn-primary w-100 fw-semibold"
+                                class="btn btn-primary w-100 fw-bold"
                                 disabled="@(!canStartPreparing)">
                             Start Preparing Order
                         </button>
@@ -308,7 +398,7 @@
                 {
                     <form asp-action="UpdateStatus" asp-route-id="@Model.Id" method="post" class="mb-2">
                         <input type="hidden" name="status" value="Completed" />
-                        <button type="submit" class="btn btn-success w-100 fw-semibold">
+                        <button type="submit" class="btn btn-success w-100 fw-bold">
                             Mark Order Completed
                         </button>
                     </form>
@@ -316,15 +406,15 @@
 
                 @if (Model.Status == "Pending" || Model.Status == "Preparing")
                 {
-                    <details class="border border-danger-subtle rounded-3 p-2 mt-2">
-                        <summary class="small fw-semibold text-danger px-1" style="cursor: pointer;">
+                    <details class="border border-danger-subtle p-2 mt-2" style="border-radius: var(--qrder-radius, 4px);">
+                        <summary class="small fw-bold text-danger px-1" style="cursor: pointer;">
                             Cancel Order with Reason
                         </summary>
                         <form asp-action="UpdateStatus" asp-route-id="@Model.Id" method="post" class="pt-2 px-1">
                             <input type="hidden" name="status" value="Cancelled" />
 
                             <div class="mb-2">
-                                <label for="cancellationPreset" class="form-label small fw-semibold mb-1">
+                                <label for="cancellationPreset" class="form-label small fw-bold mb-1">
                                     Reason
                                 </label>
                                 <select id="cancellationPreset"
@@ -339,7 +429,7 @@
                             </div>
 
                             <div class="mb-2">
-                                <label for="cancellationReason" class="form-label small fw-semibold mb-1">
+                                <label for="cancellationReason" class="form-label small fw-bold mb-1">
                                     Additional Note <span class="text-muted fw-normal">(Optional)</span>
                                 </label>
                                 <input type="text"
@@ -350,7 +440,7 @@
                                        placeholder="Enter brief details for audit log..." />
                             </div>
 
-                            <button type="submit" class="btn btn-danger w-100 btn-sm fw-semibold">
+                            <button type="submit" class="btn btn-danger w-100 btn-sm fw-bold">
                                 Confirm Order Cancellation
                             </button>
                         </form>
@@ -359,20 +449,22 @@
             </div>
         }
 
-        @* Official 80mm / 360px Thermal Sales Invoice / Official Receipt *@
+        @* Non-BIR 80mm / 360px Thermal Order Summary Slip *@
         @{
             var vatableSales = Math.Round(Model.TotalAmount / 1.12m, 2, MidpointRounding.AwayFromZero);
             var vatAmount = Model.TotalAmount - vatableSales;
             var saleBanner = Model.PaymentMethod == "Maya"
-                ? "** MAYA ONLINE SALE **"
-                : (Model.PaymentStatus == "NotTracked" ? "** COUNTER POS SALE **" : "** CASH SALE **");
+                ? "** MAYA ONLINE PAYMENT **"
+                : (Model.PaymentStatus == "NotTracked" ? "** COUNTER POS ORDER **" : "** CASH PAYMENT **");
             var channelLabel = Model.PaymentStatus == "NotTracked" ? "COUNTER POS" : "MOBILE QR ORDER";
             var encordParticulars = "Meals";
         }
 
-        <div class="qrder-receipt-slip" id="printableReceipt" style="font-family: 'Courier New', Courier, monospace; font-size: 0.82rem; line-height: 1.35;">
+        <div class="qrder-receipt-slip @(!isStaff ? "mx-auto" : "")"
+             id="printableReceipt"
+             style="font-size: 0.84rem; line-height: 1.38; max-width: @(isStaff ? "100%" : "380px");">
             <div class="text-center fw-bold" style="letter-spacing: 0.08em;">
-                SALES INVOICE / OFFICIAL RECEIPT
+                QRDER ORDER SUMMARY SLIP
             </div>
             <div class="text-center fw-bold mb-1" style="letter-spacing: 0.06em;">
                 @saleBanner
@@ -388,19 +480,18 @@
                 <div class="fw-bold fs-6">BEAN CRATE CAFE</div>
                 <div class="small">Sen. Lorenzo Sumulong Memorial Circle</div>
                 <div class="small">Brgy. San Jose, Antipolo City</div>
-                <div class="small">VAT Reg TIN: 000-000-000-000</div>
                 <div class="small">Tel: 0927 216 4623</div>
                 <div class="small">Email: beancrateph@gmail.com</div>
             </div>
 
             <div class="border-top pt-2 mb-2 small">
                 <div class="d-flex justify-content-between">
-                    <span>SI / OR #:</span>
+                    <span>Order Reference:</span>
                     <span class="fw-bold">QRDER-@Model.Id.ToString("D6")</span>
                 </div>
                 <div class="d-flex justify-content-between">
-                    <span>Date (MM/DD/YYYY):</span>
-                    <span class="fw-bold">@localOrderDate.ToString("MM/dd/yyyy")</span>
+                    <span>Date (PHT):</span>
+                    <span class="fw-bold">@localOrderDate.ToString("MMM dd, yyyy")</span>
                 </div>
                 <div class="d-flex justify-content-between">
                     <span>Time (PHT):</span>
@@ -411,12 +502,8 @@
                     <span class="fw-bold">@Model.CustomerName</span>
                 </div>
                 <div class="d-flex justify-content-between">
-                    <span>Particulars / BIR:</span>
-                    <span>@encordParticulars (VAT)</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                    <span>System:</span>
-                    <span>QRDER POS</span>
+                    <span>Order Status:</span>
+                    <span class="fw-bold">@Model.Status</span>
                 </div>
             </div>
 
@@ -457,7 +544,7 @@
 
             <div class="mb-2">
                 <div class="d-flex justify-content-between fw-bold fs-6">
-                    <span>TOTAL AMOUNT DUE</span>
+                    <span>TOTAL AMOUNT</span>
                     <span>₱@Model.TotalAmount.ToString("N2")</span>
                 </div>
                 <div class="d-flex justify-content-between small">
@@ -468,47 +555,24 @@
                 {
                     <div class="d-flex justify-content-between small">
                         <span>Paid At (PHT):</span>
-                        <span>@localPaidDate.Value.ToString("MM/dd/yyyy hh:mm tt")</span>
+                        <span>@localPaidDate.Value.ToString("MMM dd, yyyy hh:mm tt")</span>
                     </div>
                 }
                 @if (!string.IsNullOrWhiteSpace(Model.PayMongoPaymentId))
                 {
                     <div class="d-flex justify-content-between small">
-                        <span>Maya Txn Ref:</span>
+                        <span>Online Txn Ref:</span>
                         <span>@Model.PayMongoPaymentId</span>
                     </div>
                 }
             </div>
 
-            <div class="border-top pt-2 mb-2 small">
-                <div class="d-flex justify-content-between">
-                    <span>VATable Sales:</span>
-                    <span>₱@vatableSales.ToString("N2")</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                    <span>12% VAT Amount:</span>
-                    <span>₱@vatAmount.ToString("N2")</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                    <span>VAT-Exempt Sales:</span>
-                    <span>₱0.00</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                    <span>Zero-Rated Sales:</span>
-                    <span>₱0.00</span>
-                </div>
-            </div>
-
-            <div class="border-top pt-2 mb-2 small">
-                <div>Customer Name: _______________________</div>
-                <div class="mt-1">TIN / Address: _______________________</div>
-                <div class="mt-1">Signature:     _______________________</div>
-            </div>
-
             <div class="border-top pt-2 text-center small">
                 <div class="fw-bold">THANK YOU FOR VISITING BEAN CRATE!</div>
                 <div>Follow us: @@beancrateph</div>
-                <div class="mt-1 fw-bold" style="font-size: 0.72rem;">OFFICIAL SALES INVOICE / RECEIPT</div>
+                <div class="mt-1 text-muted" style="font-size: 0.70rem;">
+                    ORDER SUMMARY SLIP &middot; NOT AN OFFICIAL BIR RECEIPT
+                </div>
             </div>
         </div>
 
@@ -543,19 +607,19 @@
                     <a href="https://encord-bir-encoder2026-cyh5ffaghqhwhbht.eastasia-01.azurewebsites.net/"
                        target="_blank"
                        rel="noopener noreferrer"
-                       class="btn btn-sm menu-btn px-3 fw-semibold">
+                       class="btn btn-sm menu-btn px-3 fw-bold">
                         Open Encord &#8599;
                     </a>
                 </div>
                 <p class="text-muted small mb-2">
-                    Scan the receipt above with Encord&rsquo;s <strong>Vision AI</strong> or copy the exact <strong>15-column (A&ndash;O)</strong> tab-separated row (<code>Meals</code>, <code>VAT</code>, <code>OPS - MEALS AND LODGING</code>).
+                    Scan the slip above with Encord&rsquo;s <strong>Vision AI</strong> or copy the exact <strong>15-column (A&ndash;O)</strong> tab-separated row (<code>Meals</code>, <code>VAT</code>, <code>OPS - MEALS AND LODGING</code>).
                 </p>
                 <textarea id="encordRowPayload" class="visually-hidden" readonly>@encordCopyLine</textarea>
                 <div class="d-flex align-items-center justify-content-between gap-2">
                     <button type="button" id="copyEncordFieldsBtn" class="btn btn-sm btn-outline-secondary">
                         Copy 15-Col Encord Row
                     </button>
-                    <span id="encordCopyStatus" class="small text-success fw-semibold d-none">15 Columns Copied &#10003;</span>
+                    <span id="encordCopyStatus" class="small text-success fw-bold d-none">15 Columns Copied &#10003;</span>
                 </div>
             </div>
         }
@@ -612,11 +676,30 @@ else if (Model.Status == "Pending" || Model.Status == "Preparing")
             if (!rootEl) return;
 
             const currentOrderStatus = rootEl.getAttribute("data-order-status") || "";
+            const paymentMethod = rootEl.getAttribute("data-payment-method") || "";
             const currentPaymentStatus = rootEl.getAttribute("data-payment-status") || "";
+            const mayaCheckUrl = rootEl.getAttribute("data-maya-check-url") || "";
+            const isPendingMaya = paymentMethod === "Maya"
+                && currentPaymentStatus === "Pending"
+                && currentOrderStatus === "Pending";
 
             async function checkOrderStatusUpdate() {
                 if (document.hidden) return;
                 try {
+                    if (isPendingMaya && mayaCheckUrl) {
+                        const mayaRes = await fetch(mayaCheckUrl, {
+                            headers: { "X-Requested-With": "XMLHttpRequest" },
+                            cache: "no-store"
+                        });
+                        if (mayaRes.ok) {
+                            const data = await mayaRes.json();
+                            if (data && data.reload) {
+                                window.location.reload();
+                                return;
+                            }
+                        }
+                    }
+
                     const response = await fetch(window.location.href, {
                         headers: { "X-Requested-With": "XMLHttpRequest" },
                         cache: "no-store"
@@ -639,7 +722,7 @@ else if (Model.Status == "Pending" || Model.Status == "Preparing")
                 }
             }
 
-            setInterval(checkOrderStatusUpdate, 8000);
+            setInterval(checkOrderStatusUpdate, isPendingMaya ? 4000 : 8000);
         })();
     </script>
 }

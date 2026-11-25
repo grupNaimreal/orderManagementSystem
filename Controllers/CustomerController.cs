@@ -1,6 +1,6 @@
 // Controllers/CustomerController.cs
 // Manages customer table/walk-in sessions for both Staff/Owner POS users
-// and anonymous mobile customers.
+// and anonymous mobile customers, ensuring inactive sessions (>10 min) are reliably expired.
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -30,16 +30,38 @@ public class CustomersController : Controller
 
     private bool IsStaff => User.IsInRole("Owner") || User.IsInRole("Employee");
 
+    private async Task SyncExpiredSessionsAsync()
+    {
+        await _customerSessionService.ExpireInactiveSessionsAsync();
+
+        var cutoff = DateTime.UtcNow.AddMinutes(-10);
+        var staleSessions = await _context.Customers
+            .Where(c => c.IsActive && c.LastActivityUtc < cutoff)
+            .ToListAsync();
+
+        if (staleSessions.Count > 0)
+        {
+            foreach (var session in staleSessions)
+            {
+                session.IsActive = false;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+    }
+
     // STAFF / OWNER: View all customer sessions sorted newest-first
     [HttpGet]
     public async Task<IActionResult> Index()
     {
-        await _customerSessionService.ExpireInactiveSessionsAsync();
+        await SyncExpiredSessionsAsync();
+
         var customers = await _context.Customers
             .AsNoTracking()
             .OrderByDescending(c => c.LastActivityUtc)
             .ThenByDescending(c => c.Id)
             .ToListAsync();
+
         return View(customers);
     }
 
@@ -47,7 +69,8 @@ public class CustomersController : Controller
     [HttpGet]
     public async Task<IActionResult> Search(string term = "")
     {
-        await _customerSessionService.ExpireInactiveSessionsAsync();
+        await SyncExpiredSessionsAsync();
+
         var query = _context.Customers.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(term))
@@ -60,6 +83,7 @@ public class CustomersController : Controller
             .OrderByDescending(c => c.LastActivityUtc)
             .ThenByDescending(c => c.Id)
             .ToListAsync();
+
         return PartialView("_CustomerRows", customers);
     }
 
@@ -82,6 +106,23 @@ public class CustomersController : Controller
         var isHomeSource = string.Equals(returnTo, "home", StringComparison.OrdinalIgnoreCase);
         var cleanName = (customer.DisplayName ?? string.Empty).Trim();
         var cleanTable = (tableLabel ?? string.Empty).Trim();
+
+        var (nameValid, nameError) = CustomerNameValidator.Validate(cleanName, "Customer name");
+        var (tableValid, tableError) = CustomerNameValidator.Validate(cleanTable, "Table / counter label");
+        if (!nameValid || !tableValid)
+        {
+            var blockedMessage = nameError ?? tableError!;
+            if (isHomeSource)
+            {
+                TempData["SessionError"] = blockedMessage;
+                TempData["EnteredName"] = cleanName;
+                TempData["EnteredTable"] = cleanTable;
+                return RedirectToAction("Index", "Home", new { table = cleanTable });
+            }
+
+            ModelState.AddModelError(nameof(customer.DisplayName), blockedMessage);
+            return View(customer);
+        }
 
         if (!string.IsNullOrWhiteSpace(cleanTable)
             && !cleanName.StartsWith(cleanTable, StringComparison.OrdinalIgnoreCase))
@@ -217,6 +258,13 @@ public class CustomersController : Controller
 
         customer.DisplayName = (customer.DisplayName ?? string.Empty).Trim();
 
+        var (editNameValid, editNameError) = CustomerNameValidator.Validate(customer.DisplayName, "Customer name");
+        if (!editNameValid)
+        {
+            ModelState.AddModelError(nameof(customer.DisplayName), editNameError!);
+            return View(customer);
+        }
+
         ModelState.Clear();
         if (!TryValidateModel(customer))
         {
@@ -317,6 +365,14 @@ public class CustomersController : Controller
         if (cleanName.Length < 2 || cleanName.Length > 30)
         {
             TempData["SessionError"] = "Please enter a valid name (2–30 characters).";
+            return RedirectToAction("Index", "Home");
+        }
+
+        var (updateNameValid, updateNameError) = CustomerNameValidator.Validate(cleanName, "Your name");
+        var (updateTableValid, updateTableError) = CustomerNameValidator.Validate(tableNumber, "Table number");
+        if (!updateNameValid || !updateTableValid)
+        {
+            TempData["SessionError"] = updateNameError ?? updateTableError!;
             return RedirectToAction("Index", "Home");
         }
 

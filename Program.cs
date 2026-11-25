@@ -55,6 +55,16 @@ var app = builder.Build();
 
 app.UseForwardedHeaders();
 
+// Hardened HTTP security headers for POS & customer sessions
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    context.Response.Headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()";
+    await next();
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();
@@ -66,6 +76,22 @@ else
 }
 
 app.UseHttpsRedirection();
+
+// Cache static product photos and brand assets for 7 days to eliminate repeat image downloads
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (ctx.File.PhysicalPath != null &&
+            (ctx.Context.Request.Path.StartsWithSegments("/images") ||
+             ctx.Context.Request.Path.StartsWithSegments("/css") ||
+             ctx.Context.Request.Path.StartsWithSegments("/js")))
+        {
+            ctx.Context.Response.Headers["Cache-Control"] = "public,max-age=604800";
+        }
+    }
+});
+
 app.UseRouting();
 
 app.UseSession();
