@@ -1,3 +1,4 @@
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment WebEnv
 @{
     ViewData["Title"] = "Overview";
     var isOwner = User.IsInRole("Owner");
@@ -7,10 +8,14 @@
     string activeOrders = ViewBag.ActiveOrdersCount?.ToString() ?? "—";
     string pendingPayments = ViewBag.PendingPaymentsCount?.ToString() ?? "—";
     string todaySales = ViewBag.TodaySalesFormatted as string ?? "—";
+
+    var hasCustomPngLogo = !string.IsNullOrWhiteSpace(WebEnv.WebRootPath)
+        && System.IO.File.Exists(System.IO.Path.Combine(WebEnv.WebRootPath, "images", "qrder-logo.png"));
+    var brandLogoPath = hasCustomPngLogo ? "~/images/qrder-logo.png" : "~/images/qrder-logo.svg";
 }
 
 <style>
-    /* Roastery Press Dining Preference Segmented Toggle */
+    /* Neo-Industrial Dining Preference Segmented Toggle */
     .qrder-pref-group {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -23,14 +28,14 @@
         background-color: var(--qrder-surface, #fffdf9);
         color: var(--qrder-ink, #221610);
         font-weight: 700;
-        padding: 0.55rem 0.75rem;
+        padding: 0.45rem 0.65rem;
         box-shadow: 2px 2px 0px var(--qrder-shadow-color, #2b1d16);
         transition: background-color 0.14s ease, color 0.14s ease, transform 0.1s ease;
     }
 
     .qrder-pref-group .qrder-pref-btn.btn-sm {
-        padding: 0.4rem 0.65rem;
-        font-size: 0.85rem;
+        padding: 0.38rem 0.6rem;
+        font-size: 0.84rem;
     }
 
     .qrder-pref-group .btn-check:checked + .qrder-pref-btn {
@@ -39,10 +44,51 @@
         border-color: var(--qrder-border-strong, #2b1d16) !important;
         box-shadow: 3px 3px 0px var(--qrder-amber, #C05800);
     }
+
+    /* Compact Zero-Scroll Customer Onboarding Card */
+    .qrder-onboard-card {
+        padding: 1rem 1.15rem;
+    }
+
+    .qrder-onboard-logo-box {
+        width: 44px;
+        height: 44px;
+        background-color: var(--qrder-cream-soft);
+        border: 2px solid var(--qrder-border-strong);
+        border-radius: var(--qrder-radius, 4px);
+        box-shadow: 2px 2px 0px var(--qrder-shadow-color);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        overflow: hidden;
+    }
+
+    .qrder-onboard-logo-box img {
+        width: 32px;
+        height: 32px;
+        object-fit: contain;
+    }
+
+    @@media (min-width: 576px) {
+        .qrder-onboard-card {
+            padding: 1.45rem 1.75rem;
+        }
+    }
 </style>
 
 @if (isStaff)
 {
+    <div class="qrder-telemetry-strip mb-3">
+        <div class="d-flex align-items-center gap-2">
+            <span class="qrder-beacon" aria-hidden="true"></span>
+            <span>POS COMMAND &middot; BEAN CRATE CAFE</span>
+        </div>
+        <div class="qrder-tabular">
+            @(isOwner ? "OWNER CONSOLE" : "STAFF COUNTER") &middot; PHT (UTC+8)
+        </div>
+    </div>
+
     <div class="mb-4">
         <div class="qrder-eyebrow">WORKSPACE OVERVIEW</div>
         <h1 class="qrder-page-title">Overview</h1>
@@ -70,6 +116,7 @@
                     <div class="d-grid d-sm-flex mb-2">
                         <a asp-controller="Orders"
                            asp-action="CreateForCustomer"
+                           data-qrder-loading="Opening counter order builder..."
                            class="btn menu-btn px-4 py-2 fw-bold">
                             + New Order
                         </a>
@@ -77,16 +124,19 @@
                     <div class="d-flex flex-wrap gap-2">
                         <a asp-controller="Orders"
                            asp-action="Index"
+                           data-qrder-loading="Opening Order Board..."
                            class="btn btn-outline-secondary btn-sm px-3 py-2">
                             Order Board
                         </a>
                         <a asp-controller="Products"
                            asp-action="Index"
+                           data-qrder-loading="Opening Menu Studio..."
                            class="btn btn-outline-secondary btn-sm px-3 py-2">
                             Menu Studio
                         </a>
                         <a asp-controller="Customers"
                            asp-action="Index"
+                           data-qrder-loading="Opening Customer Sessions..."
                            class="btn btn-outline-secondary btn-sm px-3 py-2">
                             Customer Sessions
                         </a>
@@ -94,6 +144,7 @@
                         {
                             <a asp-controller="Employees"
                                asp-action="Index"
+                               data-qrder-loading="Opening Staff Accounts..."
                                class="btn btn-outline-secondary btn-sm px-3 py-2">
                                 Staff Accounts
                             </a>
@@ -108,27 +159,27 @@
                 <h2 class="h5 fw-bold mb-3">Today&rsquo;s Snapshot</h2>
                 <div class="row g-3 flex-grow-1">
                     <div class="col-6">
-                        <div class="qrder-callout h-100 d-flex flex-column justify-content-between">
-                            <div class="small text-muted fw-bold">Orders Today</div>
-                            <div class="fs-4 fw-bold mt-2">@todayOrders</div>
+                        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+                            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.05em;">Orders Today</div>
+                            <div class="fs-4 fw-bold qrder-tabular mt-1">@todayOrders</div>
                         </div>
                     </div>
                     <div class="col-6">
-                        <div class="qrder-callout h-100 d-flex flex-column justify-content-between">
-                            <div class="small text-muted fw-bold">Active Queue</div>
-                            <div class="fs-4 fw-bold mt-2">@activeOrders</div>
+                        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+                            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.05em;">Active Queue</div>
+                            <div class="fs-4 fw-bold qrder-tabular mt-1">@activeOrders</div>
                         </div>
                     </div>
                     <div class="col-6">
-                        <div class="qrder-callout h-100 d-flex flex-column justify-content-between">
-                            <div class="small text-muted fw-bold">Unpaid / Pending</div>
-                            <div class="fs-4 fw-bold mt-2">@pendingPayments</div>
+                        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+                            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.05em;">Unpaid / Pending</div>
+                            <div class="fs-4 fw-bold qrder-tabular mt-1">@pendingPayments</div>
                         </div>
                     </div>
                     <div class="col-6">
-                        <div class="qrder-callout h-100 d-flex flex-column justify-content-between">
-                            <div class="small text-muted fw-bold">Completed Sales</div>
-                            <div class="fs-4 fw-bold mt-2" style="color: var(--qrder-roast);">@todaySales</div>
+                        <div class="qrder-flap-tile h-100 d-flex flex-column justify-content-between">
+                            <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.05em;">Completed Sales</div>
+                            <div class="fs-4 fw-bold qrder-tabular mt-1" style="color: var(--qrder-roast);">@todaySales</div>
                         </div>
                     </div>
                 </div>
@@ -152,34 +203,33 @@ else
     var enteredName = (TempData["EnteredName"] as string) ?? string.Empty;
     int myOrdersCount = ViewBag.MyOrdersCount is int count ? count : 0;
 
-    <div class="mx-auto" style="max-width: 580px;">
-        <div class="qrder-card py-4 px-3 px-sm-4">
-            <div class="text-center mb-3">
-                <div class="d-inline-flex align-items-center justify-content-center p-2 mb-2"
-                     style="background-color: var(--qrder-cream-soft); border: 2px solid var(--qrder-border-strong); border-radius: var(--qrder-radius, 4px); box-shadow: 3px 3px 0px var(--qrder-shadow-color);">
-                    <img src="~/images/qrder-logo.svg"
-                         alt="QRDER Logo"
-                         style="width: 58px; height: 58px; object-fit: contain;" />
+    <div class="mx-auto" style="max-width: 540px;">
+        <div class="qrder-card qrder-onboard-card">
+            <div class="d-flex align-items-center gap-2 gap-sm-3 mb-2">
+                <div class="qrder-onboard-logo-box">
+                    <img src="@brandLogoPath" asp-append-version="true" alt="QRDER Logo" />
                 </div>
-                <div class="d-block qrder-eyebrow">BEAN CRATE CAFE &middot; ORDERING TICKET</div>
-                <h1 class="h3 fw-bold mb-1">
-                    <span class="qrder-wordmark-inline">QRDER</span>
-                </h1>
-                <p class="text-muted small fst-italic mb-0">
-                    Start your table session below to unlock the digital menu and send your order to the counter.
-                </p>
+                <div class="min-w-0">
+                    <div class="qrder-eyebrow mb-0" style="font-size: 0.66rem;">BEAN CRATE CAFE &middot; ORDER TICKET</div>
+                    <h1 class="h4 fw-bold mb-0 lh-1">
+                        <span class="qrder-wordmark-inline">QRDER</span>
+                    </h1>
+                    <p class="text-muted mb-0" style="font-size: 0.78rem; line-height: 1.25;">
+                        Enter your table &amp; name to unlock the digital menu.
+                    </p>
+                </div>
             </div>
 
-            <hr class="qrder-ticket-divider" />
+            <hr class="qrder-ticket-divider my-2" />
 
             @if (TempData["SessionNotice"] is string sessionNotice)
             {
-                <div class="alert alert-info small py-2 mb-3">@sessionNotice</div>
+                <div class="alert alert-info small py-1 px-2 mb-2">@sessionNotice</div>
             }
 
             @if (TempData["SessionError"] is string sessionError)
             {
-                <div class="alert alert-danger small py-2 mb-3">@sessionError</div>
+                <div class="alert alert-danger small py-1 px-2 mb-2">@sessionError</div>
             }
 
             @if (currentCustomer != null)
@@ -195,34 +245,36 @@ else
                         ? currentPrefix
                         : string.Empty);
 
-                <div class="qrder-callout mb-3">
+                <div class="qrder-callout py-2 px-3 mb-2">
                     <div class="d-flex align-items-center justify-content-between gap-2">
-                        <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.08em;">Active Session</div>
+                        <div class="small text-muted fw-bold text-uppercase" style="letter-spacing: 0.08em; font-size: 0.7rem;">Active Session</div>
                         <span class="badge"
                               style="background-color: var(--qrder-espresso); color: #f6efe6; border: 1.5px solid var(--qrder-border-strong);">
                             @(isTakeOut ? "Take-Out" : "Dine-In")
                         </span>
                     </div>
                     <div class="fs-5 fw-bold mt-1">@currentCustomer.DisplayName</div>
-                    <div class="small text-muted fst-italic mt-1">
-                        Your session stays active for 10 minutes between actions.
+                    <div class="text-muted fst-italic" style="font-size: 0.75rem;">
+                        Active for 10 minutes between actions.
                     </div>
                 </div>
 
-                <div class="d-grid gap-2 mb-3">
+                <div class="d-grid gap-2 mb-2">
                     <a asp-controller="Products"
                        asp-action="Index"
+                       data-qrder-loading="Opening digital menu..."
                        class="btn menu-btn py-2 fw-bold">
                         Browse Menu &amp; Order
                     </a>
                     <a asp-controller="Orders"
                        asp-action="MyOrders"
-                       class="btn btn-outline-secondary py-2">
+                       data-qrder-loading="Loading your orders..."
+                       class="btn btn-outline-secondary py-1">
                         View My Orders @(myOrdersCount > 0 ? $"({myOrdersCount})" : "")
                     </a>
                 </div>
 
-                <details class="p-3 mb-2" style="border: 2px solid var(--qrder-border-strong); border-radius: var(--qrder-radius, 4px); background-color: var(--qrder-cream-soft);">
+                <details class="p-2 mb-1" style="border: 2px solid var(--qrder-border-strong); border-radius: var(--qrder-radius, 4px); background-color: var(--qrder-cream-soft);">
                     <summary class="small fw-bold" style="cursor: pointer;">
                         Edit Name or Dine-In / Take-Out Preference
                     </summary>
@@ -230,7 +282,7 @@ else
                     <form asp-controller="Customers"
                           asp-action="UpdateMySession"
                           method="post"
-                          class="pt-3">
+                          class="pt-2">
                         <div class="mb-2">
                             <label class="form-label small fw-bold d-block mb-1">Dining Preference</label>
                             <div class="qrder-pref-group" role="group" aria-label="Dining preference">
@@ -268,7 +320,7 @@ else
                                    placeholder="e.g., 1 or Table 1" />
                         </div>
 
-                        <div class="mb-3">
+                        <div class="mb-2">
                             <label for="editDisplayName" class="form-label small fw-bold mb-1">Your Name</label>
                             <input type="text"
                                    id="editDisplayName"
@@ -289,8 +341,8 @@ else
                 <form asp-controller="Customers"
                       asp-action="EndMySession"
                       method="post"
-                      class="mt-2 text-center">
-                    <button type="submit" class="btn btn-link btn-sm text-muted text-decoration-none">
+                      class="text-center">
+                    <button type="submit" class="btn btn-link btn-sm text-muted text-decoration-none py-0">
                         End Current Session
                     </button>
                 </form>
@@ -320,12 +372,12 @@ else
                         ? tableLabel
                         : string.Empty);
 
-                <form asp-controller="Customers" asp-action="Create" method="post" id="startSessionForm">
+                <form asp-controller="Customers" asp-action="Create" method="post" id="startSessionForm" data-loading-text="Starting your table session...">
                     <input type="hidden" name="returnTo" value="home" />
                     <input type="hidden" id="tableLabel" name="tableLabel" value="@tableLabel" />
 
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-uppercase d-block mb-1" style="letter-spacing: 0.06em;">
+                    <div class="mb-2">
+                        <label class="form-label fw-bold text-uppercase d-block mb-1" style="font-size: 0.72rem; letter-spacing: 0.06em;">
                             Dining Preference
                         </label>
                         <div class="qrder-pref-group" role="group" aria-label="Dining preference">
@@ -336,7 +388,7 @@ else
                                        id="startPrefDineIn"
                                        value="DineIn"
                                        checked="@(!startIsTakeOut)" />
-                                <label class="btn qrder-pref-btn w-100" for="startPrefDineIn">Dine-In</label>
+                                <label class="btn btn-sm qrder-pref-btn w-100" for="startPrefDineIn">Dine-In</label>
                             </div>
                             <div>
                                 <input type="radio"
@@ -345,45 +397,41 @@ else
                                        id="startPrefTakeOut"
                                        value="TakeOut"
                                        checked="@(startIsTakeOut)" />
-                                <label class="btn qrder-pref-btn w-100" for="startPrefTakeOut">Take-Out</label>
+                                <label class="btn btn-sm qrder-pref-btn w-100" for="startPrefTakeOut">Take-Out</label>
                             </div>
                         </div>
                     </div>
 
-                    <div class="mb-3 @(startIsTakeOut ? "d-none" : "")" id="startTableNumberGroup">
-                        <label for="startTableNumber" class="form-label small fw-bold text-uppercase" style="letter-spacing: 0.06em;">
-                            Table Number <span class="text-muted fw-normal fst-italic" style="text-transform: none;">(Optional)</span>
-                        </label>
-                        <input type="text"
-                               id="startTableNumber"
-                               value="@startTableNum"
-                               maxlength="12"
-                               class="form-control"
-                               placeholder="e.g., 1 or Table 1" />
-                        <div class="form-text small fst-italic">
-                            Leave blank if you haven&rsquo;t chosen a table yet.
+                    <div class="row g-2 mb-2">
+                        <div class="col-5 @(startIsTakeOut ? "d-none" : "")" id="startTableNumberGroup">
+                            <label for="startTableNumber" class="form-label fw-bold text-uppercase mb-1" style="font-size: 0.72rem; letter-spacing: 0.06em;">
+                                Table # <span class="text-muted fw-normal fst-italic" style="text-transform: none;">(Opt.)</span>
+                            </label>
+                            <input type="text"
+                                   id="startTableNumber"
+                                   value="@startTableNum"
+                                   maxlength="12"
+                                   class="form-control form-control-sm"
+                                   placeholder="e.g., 1" />
+                        </div>
+
+                        <div class="@(startIsTakeOut ? "col-12" : "col-7")" id="startNameCol">
+                            <label for="DisplayName" class="form-label fw-bold text-uppercase mb-1" style="font-size: 0.72rem; letter-spacing: 0.06em;">
+                                Your Name
+                            </label>
+                            <input type="text"
+                                   id="DisplayName"
+                                   name="DisplayName"
+                                   value="@enteredName"
+                                   minlength="2"
+                                   maxlength="30"
+                                   required
+                                   class="form-control form-control-sm"
+                                   placeholder="e.g., Juan" />
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="DisplayName" class="form-label small fw-bold text-uppercase" style="letter-spacing: 0.06em;">
-                            Your Name
-                        </label>
-                        <input type="text"
-                               id="DisplayName"
-                               name="DisplayName"
-                               value="@enteredName"
-                               minlength="2"
-                               maxlength="30"
-                               required
-                               class="form-control"
-                               placeholder="Enter your name (e.g., Juan)" />
-                        <div class="form-text small fst-italic">
-                            2&ndash;30 characters. Used so our baristas can call your order.
-                        </div>
-                    </div>
-
-                    <div class="d-grid">
+                    <div class="d-grid mt-2">
                         <button type="submit" class="btn menu-btn py-2 fw-bold">
                             Start Session &amp; Open Menu
                         </button>
@@ -396,12 +444,16 @@ else
                         const dineInRadio = document.getElementById("startPrefDineIn");
                         const takeOutRadio = document.getElementById("startPrefTakeOut");
                         const tableGroup = document.getElementById("startTableNumberGroup");
+                        const nameCol = document.getElementById("startNameCol");
                         const tableInput = document.getElementById("startTableNumber");
                         const hiddenLabel = document.getElementById("tableLabel");
 
                         function syncStartSessionPreference() {
                             const isTakeOut = Boolean(takeOutRadio?.checked);
                             tableGroup?.classList.toggle("d-none", isTakeOut);
+                            if (nameCol) {
+                                nameCol.className = isTakeOut ? "col-12" : "col-7";
+                            }
 
                             if (!hiddenLabel) return;
                             if (isTakeOut) {

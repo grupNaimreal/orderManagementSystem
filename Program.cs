@@ -111,6 +111,9 @@ app.MapControllerRoute(
 app.MapRazorPages()
    .WithStaticAssets();
 
+// Lightweight health endpoint for zero-cost uptime pingers (prevents Render free-tier sleep)
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

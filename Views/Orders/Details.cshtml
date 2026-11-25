@@ -105,6 +105,13 @@
     </div>
 
     <div class="d-flex flex-wrap gap-2">
+        <button type="button"
+                id="toggleOrderSlipBtn"
+                aria-expanded="false"
+                aria-controls="orderSlipCollapseWrap"
+                class="btn btn-outline-secondary px-3">
+            Show Order Summary Slip
+        </button>
         @if (isStaff)
         {
             <button type="button" onclick="window.print()" class="btn btn-outline-secondary px-3">
@@ -449,7 +456,7 @@
             </div>
         }
 
-        @* Non-BIR 80mm / 360px Thermal Order Summary Slip *@
+        @* Non-BIR 80mm / 360px Thermal Order Summary Slip (Hidden until toggled on screen; always visible on print) *@
         @{
             var vatableSales = Math.Round(Model.TotalAmount / 1.12m, 2, MidpointRounding.AwayFromZero);
             var vatAmount = Model.TotalAmount - vatableSales;
@@ -460,118 +467,119 @@
             var encordParticulars = "Meals";
         }
 
-        <div class="qrder-receipt-slip @(!isStaff ? "mx-auto" : "")"
-             id="printableReceipt"
-             style="font-size: 0.84rem; line-height: 1.38; max-width: @(isStaff ? "100%" : "380px");">
-            <div class="text-center fw-bold" style="letter-spacing: 0.08em;">
-                QRDER ORDER SUMMARY SLIP
-            </div>
-            <div class="text-center fw-bold mb-1" style="letter-spacing: 0.06em;">
-                @saleBanner
-            </div>
+        <div id="orderSlipCollapseWrap" class="d-none mb-3">
+            <div class="qrder-receipt-slip @(!isStaff ? "mx-auto" : "")"
+                 id="printableReceipt"
+                 style="font-size: 0.84rem; line-height: 1.38; max-width: @(isStaff ? "100%" : "380px");">
+                <div class="text-center fw-bold" style="letter-spacing: 0.08em;">
+                    QRDER ORDER SUMMARY SLIP
+                </div>
+                <div class="text-center fw-bold mb-1" style="letter-spacing: 0.06em;">
+                    @saleBanner
+                </div>
 
-            <div class="text-center border-top border-bottom py-2 my-2">
-                <div class="small text-uppercase">Queue / Order Number</div>
-                <div class="fs-2 fw-bold lh-1 my-1">#@Model.Id</div>
-                <div class="small fw-bold">@channelLabel</div>
-            </div>
+                <div class="text-center border-top border-bottom py-2 my-2">
+                    <div class="small text-uppercase">Queue / Order Number</div>
+                    <div class="fs-2 fw-bold lh-1 my-1">#@Model.Id</div>
+                    <div class="small fw-bold">@channelLabel</div>
+                </div>
 
-            <div class="text-center mb-2">
-                <div class="fw-bold fs-6">BEAN CRATE CAFE</div>
-                <div class="small">Sen. Lorenzo Sumulong Memorial Circle</div>
-                <div class="small">Brgy. San Jose, Antipolo City</div>
-                <div class="small">Tel: 0927 216 4623</div>
-                <div class="small">Email: beancrateph@gmail.com</div>
-            </div>
+                <div class="text-center mb-2">
+                    <div class="fw-bold fs-6">BEAN CRATE CAFE</div>
+                    <div class="small">Sen. Lorenzo Sumulong Memorial Circle</div>
+                    <div class="small">Brgy. San Jose, Antipolo City</div>
+                    <div class="small">Tel: 0927 216 4623</div>
+                    <div class="small">Email: beancrateph@gmail.com</div>
+                </div>
 
-            <div class="border-top pt-2 mb-2 small">
-                <div class="d-flex justify-content-between">
-                    <span>Order Reference:</span>
-                    <span class="fw-bold">QRDER-@Model.Id.ToString("D6")</span>
+                <div class="border-top pt-2 mb-2 small">
+                    <div class="d-flex justify-content-between">
+                        <span>Order Reference:</span>
+                        <span class="fw-bold">QRDER-@Model.Id.ToString("D6")</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Date (PHT):</span>
+                        <span class="fw-bold">@localOrderDate.ToString("MMM dd, yyyy")</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Time (PHT):</span>
+                        <span>@localOrderDate.ToString("hh:mm tt")</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Customer / Table:</span>
+                        <span class="fw-bold">@Model.CustomerName</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Order Status:</span>
+                        <span class="fw-bold">@Model.Status</span>
+                    </div>
                 </div>
-                <div class="d-flex justify-content-between">
-                    <span>Date (PHT):</span>
-                    <span class="fw-bold">@localOrderDate.ToString("MMM dd, yyyy")</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                    <span>Time (PHT):</span>
-                    <span>@localOrderDate.ToString("hh:mm tt")</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                    <span>Customer / Table:</span>
-                    <span class="fw-bold">@Model.CustomerName</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                    <span>Order Status:</span>
-                    <span class="fw-bold">@Model.Status</span>
-                </div>
-            </div>
 
-            <div class="border-top border-bottom py-2 my-2">
-                <table class="w-100" style="border-collapse: collapse; font-size: 0.78rem;">
-                    <thead>
-                        <tr class="border-bottom">
-                            <th class="text-start pb-1" style="width: 12%;">QTY</th>
-                            <th class="text-start pb-1" style="width: 46%;">ITEM</th>
-                            <th class="text-end pb-1" style="width: 20%;">PRICE</th>
-                            <th class="text-end pb-1" style="width: 22%;">TOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var item in Model.Items)
-                        {
-                            <tr>
-                                <td class="align-top pt-1 fw-bold">@item.Quantity</td>
-                                <td class="align-top pt-1 pe-1">
-                                    <div class="fw-bold">@item.ProductNameSnapshot</div>
-                                    @if (item.SelectedOptions != null && item.SelectedOptions.Any())
-                                    {
-                                        foreach (var opt in item.SelectedOptions)
-                                        {
-                                            <div style="font-size: 0.72rem; padding-left: 6px;">
-                                                + @opt.NameSnapshot (@(opt.PriceAdjustment >= 0 ? "+" : "")@opt.PriceAdjustment.ToString("N2"))
-                                            </div>
-                                        }
-                                    }
-                                </td>
-                                <td class="align-top text-end pt-1">@item.UnitPrice.ToString("N2")</td>
-                                <td class="align-top text-end pt-1 fw-bold">@item.LineTotal.ToString("N2")</td>
+                <div class="border-top border-bottom py-2 my-2">
+                    <table class="w-100" style="border-collapse: collapse; font-size: 0.78rem;">
+                        <thead>
+                            <tr class="border-bottom">
+                                <th class="text-start pb-1" style="width: 12%;">QTY</th>
+                                <th class="text-start pb-1" style="width: 46%;">ITEM</th>
+                                <th class="text-end pb-1" style="width: 20%;">PRICE</th>
+                                <th class="text-end pb-1" style="width: 22%;">TOTAL</th>
                             </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="mb-2">
-                <div class="d-flex justify-content-between fw-bold fs-6">
-                    <span>TOTAL AMOUNT</span>
-                    <span>₱@Model.TotalAmount.ToString("N2")</span>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.Items)
+                            {
+                                <tr>
+                                    <td class="align-top pt-1 fw-bold">@item.Quantity</td>
+                                    <td class="align-top pt-1 pe-1">
+                                        <div class="fw-bold">@item.ProductNameSnapshot</div>
+                                        @if (item.SelectedOptions != null && item.SelectedOptions.Any())
+                                        {
+                                            foreach (var opt in item.SelectedOptions)
+                                            {
+                                                <div style="font-size: 0.72rem; padding-left: 6px;">
+                                                    + @opt.NameSnapshot (@(opt.PriceAdjustment >= 0 ? "+" : "")@opt.PriceAdjustment.ToString("N2"))
+                                                </div>
+                                            }
+                                        }
+                                    </td>
+                                    <td class="align-top text-end pt-1">@item.UnitPrice.ToString("N2")</td>
+                                    <td class="align-top text-end pt-1 fw-bold">@item.LineTotal.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
                 </div>
-                <div class="d-flex justify-content-between small">
-                    <span>Payment Method:</span>
-                    <span>@Model.PaymentMethod (@Model.PaymentStatus)</span>
-                </div>
-                @if (localPaidDate.HasValue)
-                {
-                    <div class="d-flex justify-content-between small">
-                        <span>Paid At (PHT):</span>
-                        <span>@localPaidDate.Value.ToString("MMM dd, yyyy hh:mm tt")</span>
-                    </div>
-                }
-                @if (!string.IsNullOrWhiteSpace(Model.PayMongoPaymentId))
-                {
-                    <div class="d-flex justify-content-between small">
-                        <span>Online Txn Ref:</span>
-                        <span>@Model.PayMongoPaymentId</span>
-                    </div>
-                }
-            </div>
 
-            <div class="border-top pt-2 text-center small">
-                <div class="fw-bold">THANK YOU FOR VISITING BEAN CRATE!</div>
-                <div>Follow us: @@beancrateph</div>
-                <div class="mt-1 text-muted" style="font-size: 0.70rem;">
-                    ORDER SUMMARY SLIP &middot; NOT AN OFFICIAL BIR RECEIPT
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between fw-bold fs-6">
+                        <span>TOTAL AMOUNT</span>
+                        <span>₱@Model.TotalAmount.ToString("N2")</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span>Payment Method:</span>
+                        <span>@Model.PaymentMethod (@Model.PaymentStatus)</span>
+                    </div>
+                    @if (localPaidDate.HasValue)
+                    {
+                        <div class="d-flex justify-content-between small">
+                            <span>Paid At (PHT):</span>
+                            <span>@localPaidDate.Value.ToString("MMM dd, yyyy hh:mm tt")</span>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.PayMongoPaymentId))
+                    {
+                        <div class="d-flex justify-content-between small">
+                            <span>Online Txn Ref:</span>
+                            <span>@Model.PayMongoPaymentId</span>
+                        </div>
+                    }
+                </div>
+
+                <div class="border-top pt-2 text-center small">
+                    <div class="fw-bold">THANK YOU FOR VISITING BEAN CRATE!</div>
+                    <div>Follow us: @@beancrateph</div>
+                    <div class="mt-1 text-muted" style="font-size: 0.70rem;">
+                        ORDER SUMMARY SLIP &middot; NOT AN OFFICIAL BIR RECEIPT
                 </div>
             </div>
         </div>
@@ -625,6 +633,23 @@
         }
     </div>
 </div>
+
+<script>
+    (() => {
+        const toggleSlipBtn = document.getElementById("toggleOrderSlipBtn");
+        const slipWrap = document.getElementById("orderSlipCollapseWrap");
+
+        toggleSlipBtn?.addEventListener("click", () => {
+            if (!slipWrap) return;
+            const willShow = slipWrap.classList.contains("d-none");
+            slipWrap.classList.toggle("d-none", !willShow);
+            toggleSlipBtn.textContent = willShow
+                ? "Hide Order Summary Slip"
+                : "Show Order Summary Slip";
+            toggleSlipBtn.setAttribute("aria-expanded", willShow ? "true" : "false");
+        });
+    })();
+</script>
 
 @if (isStaff)
 {

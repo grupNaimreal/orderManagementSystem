@@ -2,11 +2,11 @@
     Views/Products/_ProductRows.cshtml
     Shared product card grid rendered inside Views/Products/Index.cshtml
     and returned dynamically by ProductsController.Search.
-    - Entire card is clickable to open item customization/details.
-    - Displays product photo (/images/products/{slug}.jpg or custom ImageUrl)
-      with a tailored category-themed illustrated fallback card when no photo file is present yet.
+    - Resolves product images via MenuSeeder.ResolveProductImageUrl(item.ImageUrl, item.Name, WebEnv.WebRootPath)
+      so Linux/Docker deployments match exact filenames and extensions reliably.
 *@
 @using Microsoft.AspNetCore.Html
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment WebEnv
 @model IEnumerable<orderManagementSystem.Models.Product>
 
 @{
@@ -77,7 +77,10 @@
     var detailsUrl = Url.Action("Details", "Products", new { id = item.Id });
     var categoryName = string.IsNullOrWhiteSpace(item.Category?.Name) ? "Other" : item.Category!.Name.Trim();
     var visual = GetProductVisual(categoryName);
-    var resolvedImageUrl = orderManagementSystem.Data.MenuSeeder.ResolveProductImageUrl(item.Name, item.ImageUrl);
+    var resolvedImageUrl = orderManagementSystem.Data.MenuSeeder.ResolveProductImageUrl(
+        item.ImageUrl,
+        item.Name,
+        WebEnv.WebRootPath);
     var isAboveTheFold = cardIndex < 4;
     cardIndex++;
 
